@@ -6,6 +6,9 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PRISMA_SERVICE } from 'src/multi-tenant/multi-tenant.module';
 
+import { Knex } from 'knex';
+import { InjectKnex } from 'nestjs-knex';
+
 @Injectable()
 export class OrderableService {
   constructor(
