@@ -26,6 +26,11 @@ export class OrderableController {
     return this.orderableService.findAll();
   }
 
+  @Get('knex')
+  findAllKnex() {
+    return this.orderableService.findKnex();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.orderableService.findOne(+id);

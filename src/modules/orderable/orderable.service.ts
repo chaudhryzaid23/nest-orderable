@@ -13,6 +13,7 @@ import { InjectKnex } from 'nestjs-knex';
 export class OrderableService {
   constructor(
     @Inject(PRISMA_SERVICE) private readonly prisma: PrismaService,
+    @InjectKnex() private readonly knex: Knex,
     private readonly configService: ConfigService,
   ) {}
 
@@ -22,6 +23,11 @@ export class OrderableService {
 
   async findAll() {
     const result = await this.prismaQuery();
+    return result;
+  }
+
+  async findKnex() {
+    const result = await this.knexQuery();
     return result;
   }
 
@@ -63,6 +69,27 @@ export class OrderableService {
         orderableId: { in: Array.from(orderableIds) },
       },
     });
+
+    return `Total Records are: ${result.length}`;
+  }
+
+  async knexQuery(): Promise<string> {
+    const patientId = 'AHSAN-PATIENT-ID';
+    const startTime = 0;
+    const endTime = 999999999999;
+
+    const knexQuery = this.knex
+      .select(this.knex.raw(`any_value(acquisitionTime) as c`))
+      .from('OrderableValue')
+      .where('acquisitionTime', '>', Number(startTime))
+      .where('acquisitionTime', '<', Number(endTime))
+      .innerJoin('Patient', 'Patient.patientId', 'OrderableValue.patientId')
+      .where('Patient.patientId', '=', patientId)
+      .groupBy(this.knex.raw(`DATE(FROM_UNIXTIME(acquisitionTime))`));
+
+    const result: { c: bigint }[] = await this.prisma.$queryRawUnsafe(
+      knexQuery.toQuery(),
+    );
 
     return `Total Records are: ${result.length}`;
   }
