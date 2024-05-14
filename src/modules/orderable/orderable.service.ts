@@ -43,6 +43,36 @@ export class OrderableService {
     return `This action removes a #${id} orderable`;
   }
 
+  async prismaPatientProgressReportQuery() {
+    const patientId = 'AHSAN-PATIENT-ID';
+    const startTime = 0;
+    const endTime = 999999999999;
+    const recs = await this.prisma.uSEscalation.findMany({
+      select: { orderableValue: { select: { orderableId: true } } },
+      where: {
+        orderableValue: {
+          patientId,
+          acquisitionTime: { gte: startTime, lte: endTime },
+        },
+      },
+    });
+
+    let orderableIds: Set<string> = new Set();
+
+    recs.map((rec) => {
+      orderableIds.add(rec.orderableValue.orderableId);
+    });
+    const result = await this.prisma.orderableValue.findMany({
+      where: {
+        patientId,
+        acquisitionTime: { gte: startTime, lte: endTime },
+        orderableId: { in: Array.from(orderableIds) },
+      },
+    });
+
+    return `Total Records are: ${result.length}`;
+  }
+
   async prismaQuery() {
     const patientId = 'AHSAN-PATIENT-ID';
     const startTime = 0;
