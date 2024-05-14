@@ -27,7 +27,7 @@ export class OrderableService {
   }
 
   async findKnex() {
-    const result = await this.knexQuery();
+    const result = await this.knexGraphQuery();
     return result;
   }
 
@@ -90,6 +90,42 @@ export class OrderableService {
     const result: { c: bigint }[] = await this.prisma.$queryRawUnsafe(
       knexQuery.toQuery(),
     );
+
+    return `Total Records are: ${result.length}`;
+  }
+
+  async knexGraphQuery(): Promise<string> {
+    const patientId = 'AHSAN-PATIENT-ID';
+    const startTime = 0;
+    const endTime = 999999999999;
+
+    const knexQuery1 = this.knex
+      .distinct('OrderableValue.orderableId')
+      .from('USEscalation')
+      .innerJoin(
+        'OrderableValue',
+        'OrderableValue.orderableValueId',
+        'USEscalation.orderableValueId',
+      )
+      .where('OrderableValue.patientId', '=', 'AHSAN-PATIENT-ID')
+      .where('acquisitionTime', '>', Number(startTime))
+      .where('acquisitionTime', '<', Number(endTime));
+
+    const knexQuery = this.knex
+      .select('orderableValueId')
+      .from('OrderableValue')
+      .where('orderableId', 'in', knexQuery1)
+      .where('OrderableValue.patientId', '=', 'AHSAN-PATIENT-ID')
+      .where('acquisitionTime', '>', Number(startTime))
+      .where('acquisitionTime', '<', Number(endTime));
+
+    console.log(knexQuery.toQuery());
+
+    const result: { c: bigint }[] = await this.prisma.$queryRawUnsafe(
+      knexQuery.toQuery(),
+    );
+
+    console.log(result);
 
     return `Total Records are: ${result.length}`;
   }
