@@ -1,0 +1,2598 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider        = "prisma-client-js"
+    previewFeatures = ["relationJoins"]
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("DATABASE_URL")
+}
+
+// generator erd {
+//     provider                  = "prisma-erd-generator"
+//     output                    = "debug/ERD.svg"
+//     erdDebug                  = true
+//     tableOnly                 = false
+//     includeRelationFromFields = false
+//     theme                     = "default"
+// }
+
+// // Viewer at: https://dbdiagram.io/home
+// generator dbml {
+//     provider = "prisma-dbml-generator"
+// }
+
+enum Gender {
+    MALE
+    FEMALE
+    OTHER
+}
+
+enum EventLogType {
+    CALL
+    TAKEN
+    MISSED
+    NOTIFICATION_SENT
+    NOTIFICATION_FAILED
+    ON_BOARDING_COMPLETED
+}
+
+enum ActionsType {
+    LOG_IN
+    LOG_OUT
+    SESSION_TIMEOUT
+    PATIENT_REGISTERED
+    PATIENT_ON_BOARDED
+    ADDVERSE_EVENT_ADDED
+    RECORD_UPDATED
+    RECORD_ACCESSED
+    MAKE_CALL
+    CALL_ACCEPTED
+    CALL_CLOSED
+    CALL_MISSED
+    CALL_RECORDING_PLAYBACK
+    CREATE_EMPLOYEE
+    UPDATED_EMPLOYEE
+    ROLE_CREATED
+    ROLE_UPDATED
+    PRIVILEGES_ASSIGNED
+    GENERIC_ADMIN_ACTIVITY
+    ORDERABLE_UPDATED
+    ORDERABLE_ASSIGNED
+    ORDERABLE_UN_ASSIGNED
+    MESSAGE_DEVLIVERED
+    FAILED_TO_SEND_MESSAGE
+    NEW_ESCALATION
+    NEW_MESSAGE
+    ESCALATION_CLOSED
+    OBSERVATION_RECIEVED
+    OBSERVATION_UPDATED
+    REPORT_CREATED
+    REPORT_ACCESSED
+    REPORT_DOWNLOADED
+}
+
+enum AuditModuleType {
+    SYSTEM
+    PATIENT_RECORD
+    APPOINTMENT
+    CONSULTATION
+    BILL_PAYMENTS
+    CALLS
+    ADMIN
+    SUBSCRIPTION
+    ORDERABLE
+    NOTIFICATIONS
+    COMMAND_CENTER
+    REPORTS
+    DOCTORS_SETTINGS
+    ROLES
+    IPD
+}
+
+enum PatientType {
+    ACUTE
+    CHRONIC
+    REMOTE_MONITORING
+}
+
+enum EmployeeType {
+    CHI_US
+    CHI_PAK
+    PRACTICE_EMPLOYEE
+}
+
+enum InsuranceStatus {
+    INSURED
+    COPAY
+    WONT_COPAY
+    UNINSURED
+}
+
+enum TrainingMaterialType {
+    BROCHURE
+    DEVICE_VIDEO_TUTORIAL
+    CHARMS_TUTORIAL
+}
+
+///{"modulePath": "src/modules/users"}
+model User {
+    userId          String  @id @db.Char(40) /// {"size": 40, "dropdown": true}
+    username        String  @unique /// {"dropdown": true}
+    password        String
+    firstName       String
+    image           String? @db.VarChar(300)
+    title           String?
+    middleName      String?
+    lastName        String?
+    fullName        String
+    // roleType   RoleType?
+    gender          Gender?
+    birthDate       BigInt?
+    birthDateString String? @default("-")
+
+    email  String? @unique @db.VarChar(100) /// {"dropdown": true}
+    mobile String  @unique
+    phone  String?
+
+    nic      String? @unique
+    address1 String?
+    address2 String?
+    zipCode  String?
+
+    isActivated            Boolean @default(false)
+    emailVerified          Boolean @default(false)
+    phoneVerified          Boolean @default(false)
+    useTwoFactor           Boolean @default(false)
+    otpSecret              String? @db.VarChar(40)
+    incorrectPasswordCount Int?    @default(0)
+    emergencyContactPerson String?
+    emergencyContactPhone  String?
+
+    userInt    Int?
+    userDate   BigInt?
+    userString String? @db.Char(255)
+    userFloat  Float?
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    userSessions UserSession[]
+
+    //one of the following should be non-null
+    // guardian Guardian?
+    // patient  Patient?
+    // employee Employee?
+    patient         Patient?
+    employee        Employee?
+    guardian        Guardian?
+    userSetting     UserSetting?
+    userCodes       UserCode[]
+    createdSubjects RPMSubject[]
+    sentMessages    RPMMessage[]
+    // receivedMessages      Message[]               @relation("receiver")
+
+    userSubjects                UserSubject[]
+    messages                    UserMessage[]
+    rmsAdmissionCaregivers      RMSAdmissionCaregiver[]
+    eventLogs                   EventLogs[]
+    billableEventReports        BillableEventReport[]
+    userDevices                 UserDevice[]
+    patientToICD10Codes         PatientToICD10Code[]
+    auditLogs                   AuditLogs[]
+    reminderUsers               ReminderUser[]
+    reminders                   Reminder[]
+    answerSheets                QUAnswerSheet[]
+    patientRecruitment          PatientRecruitment[]
+    userRoles                   UserRole[]
+    UsedPassword                UsedPassword[]
+    tableColumnConfigs          TableColumnConfig[]
+    FlagToPatient               FlagToPatients[]              @relation("userCreated")
+    FlagToPatients              FlagToPatients[]              @relation("userResolve")
+    deviceReceival              DeviceReceival[]
+    deviceOrder                 DeviceOrder[]
+    DeviceInventoryHistory      DeviceInventoryHistory[]
+    ExternalCommunicationRecord ExternalCommunicationRecord[]
+}
+
+model UsedPassword {
+    usedPasswordId String @id @db.Char(40)
+
+    user   User   @relation(fields: [userId], references: [userId])
+    userId String @db.Char(40)
+
+    password String
+    setOn    BigInt
+}
+
+///{"modulePath": "src/modules/users"}
+model UserSession {
+    sessionId   String @id @db.Char(40) /// {"size": 40}
+    sessionData String @db.Text()
+
+    device      String
+    deviceName  String?
+    deviceModel String?
+    osName      String?
+    osVersion   String?
+
+    tzOffset BigInt?
+    userId   String  @db.Char(40) /// {"size": 40}
+    user     User    @relation(fields: [userId], references: [userId])
+}
+
+///{"modulePath": "src/modules/users"}
+model UserCode {
+    userCodeId String @id @db.Char(40) /// {"size": 40}
+
+    codeType     CodeType
+    code         String   @db.Char(8) /// {"size": 8}
+    expiresAt    BigInt
+    appSignature String?  @db.Char(32) /// {"size": 32}
+
+    userId String @db.Char(40)
+    user   User   @relation(fields: [userId], references: [userId])
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+model Annoucements {
+    annoucementId            String                        @id @db.Char(40)
+    employee                 Employee                      @relation(fields: [employeeId], references: [employeeId])
+    employeeId               String                        @db.Char(40)
+    sentOn                   BigInt
+    noOfPatients             Int?
+    noOfPractices            Int? // later will be required
+    noOfEmployees            Int?
+    mode                     AnnoucementsUnit
+    announcementTo           AnnouncementTo                @default(PATIENTS)
+    emailTitle               String?                       @db.Text
+    emailDescription         String?                       @db.Text
+    notificationTitle        String?                       @db.Text
+    notificationsDescription String?                       @db.Text
+    dateCreated              BigInt
+    dateUpdated              BigInt
+    PracticePatient          PracticePatientAnnoucements[]
+    announcemnetRegistery    AnnouncementRegistery[]
+}
+
+model PracticePatientAnnoucements {
+    practicePatientId    String             @id @db.Char(40)
+    practice             HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+    healthcareFacilityId String
+    patient              Patient            @relation(fields: [patientId], references: [patientId])
+    patientId            String
+    annoucement          Annoucements       @relation(fields: [annoucementId], references: [annoucementId])
+    annoucementId        String             @db.Char(40)
+}
+
+model AnnouncementRegistery {
+    announcementRegisteryId String @id @db.Char(40)
+
+    healthcareFacility   HealthcareFacility? @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+    healthcareFacilityId String?             @db.Char(40)
+
+    employee   Employee? @relation(fields: [employeeId], references: [employeeId])
+    employeeId String?   @db.Char(40)
+
+    patient   Patient? @relation(fields: [patientId], references: [patientId])
+    patientId String?  @db.Char(40)
+
+    announcement   Annoucements @relation(fields: [announcementId], references: [annoucementId])
+    announcementId String       @db.Char(40)
+}
+
+///{"modulePath": "src/modules/users"}
+model UserDevice {
+    userDeviceId String @id @db.Char(40) /// {"size": 40}
+
+    deviceId    String @db.Char(32) /// {"size": 32}
+    deviceName  String @db.Char(64) /// {"size": 64}
+    deviceModel String @db.Char(64) /// {"size": 64}
+    deviceType  String @db.Char(64) /// {"size": 64}
+
+    userId String @db.Char(40)
+    user   User   @relation(fields: [userId], references: [userId])
+
+    appSessionStates AppSessionState[]
+}
+
+enum AnnoucementsUnit {
+    ALL
+    PUSH_NOTIFICATIONS
+    EMAIL
+}
+
+enum AnnouncementTo {
+    PATIENTS
+    PRACTICES
+    PRACTICES_EMPLOYEES
+}
+
+enum RepeatTimeUnit {
+    DAY
+    WEEK
+    MONTH
+}
+
+enum CodeType {
+    ACCOUNT_VERIFICATION
+    VERIFY_PHONE
+    FORGOT_PASSWORD
+    TWO_FACTOR_LOGIN
+}
+
+enum ResultableDataType {
+    NUMBER
+    TEXT
+    DATA
+    FILEURL
+}
+
+enum OrderableStatus {
+    SEEN
+    UNHANDLED
+    HANDLED
+    INVALID
+    ESCALATED_TO_RN
+    ESCALATED_TO_PRACTICE
+    ESCALATED_AND_HANDLED
+}
+
+enum OrderableColorStatus {
+    NORMAL
+    ABNORMAL
+    WARNING
+    CRITICAL
+    INVALID
+}
+
+enum MessageContentType {
+    TEXT
+    AUDIO
+    VIDEO
+    PDF
+    IMAGE
+}
+
+enum ResultableStatus {
+    ABNORMAL_LOW
+    CRITICAL_LOW
+    WARNING_LOW
+    NORMAL
+    WARNING_HIGH
+    CRITIAL_HIGH
+    ABNORMAL_HIGH
+}
+
+enum OrderableType {
+    VITAL
+    HOMECARE
+    MEDICINE
+    RADIOLOGY
+    LAB
+}
+
+enum OrderType {
+    DAILY
+    WEEKLY
+    ADVANCED
+}
+
+enum MessageWorkflow {
+    ESCALATED
+    RESPONDED
+    CLOSED
+    ORDERABLE //
+    GENERAL
+    HANDOVERSHEET // added for handoversheet
+}
+
+enum HandOverSheetStatus {
+    READINGSUNREMARKABLE
+    READINGSDISCUSSION
+    READINGSDISCUSSED
+    READINGSONHOLD
+}
+
+enum MessageDeliveryStatus {
+    SENT
+    DELIVERED
+    SEEN
+}
+
+enum Theme {
+    LIGHT
+    DARK
+}
+
+enum AdmissionStatus {
+    NOT_ADMITTED
+    ADMITTED
+    DISCHARGED
+}
+
+enum ActivationStatus {
+    // New patient referal
+    REFERRED
+
+    // Insurance verification
+    INSURANCE_VERIFIED
+
+    // First call to patient
+    ACCEPTED
+    DECLINED
+    DID_NOT_ANSWER
+
+    // Training call schedule
+    TRAINING_SCHEDULED
+
+    // Device assignment
+    ASSIGNED
+
+    // RPM Active
+    ACTIVE
+
+    // Hibernate
+    INACTIVE
+
+    // Discharged
+    TERMINATE
+}
+
+enum DeviceStatus {
+    AVAILABLE
+    //Assigned
+    ASSIGNED
+
+    UN_ASSIGNED
+
+    INITIATE_RETURN
+
+    DEVICE_LOST
+
+    DAMAGED
+}
+
+enum DeviceOrderType {
+    ORDER
+
+    INVENTORY_ADDED
+}
+
+///{"modulePath": "src/modules"}
+model Setting {
+    settingId   String @id @db.Char(40)
+    settingName String @unique @db.VarChar(100)
+    settingJson String @db.Text
+}
+
+model UserSetting {
+    userSettingId   String  @id @db.Char(40)
+    notify          Boolean @default(true)
+    theme           Theme   @default(LIGHT)
+    language        String?
+    userId          String  @unique
+    user            User    @relation(fields: [userId], references: [userId])
+    userSettingJson String  @db.Text
+}
+
+///{"modulePath": "src/modules/users"}
+model Specialty {
+    specialtyId String     @id @db.Char(40) /// {"size": 40}
+    /// {"options": ["CARDIOLOGY","DERMATOLOGY","ENDOCRINOLOGY","GASTROENTEROLOGY","HEMATOLOGY"]}
+    specialty   String     @unique
+    employees   Employee[]
+}
+
+///{"modulePath": "src/modules"}
+model InsuranceCompany {
+    insuranceCompanyId String @id @db.Char(40)
+    name               String @unique @db.VarChar(100)
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    insurancePlan InsurancePlan[]
+}
+
+///{"modulePath": "src/modules"}
+model InsurancePlan {
+    insurancePlanId String @id @db.Char(40)
+    plan            String @db.VarChar(100)
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    insuranceCompanyId String           @db.Char(40)
+    insuranceCompany   InsuranceCompany @relation(fields: [insuranceCompanyId], references: [insuranceCompanyId])
+
+    patient Patient[]
+}
+
+///{"modulePath": "src/modules/users"}
+model Guardian {
+    guardianId String @id @db.Char(40) /// {"dropdown": true}
+    userId     String @unique @db.Char(40) /// {"size": 40}
+    ///{"includeInCreate":true}
+    user       User   @relation(fields: [userId], references: [userId])
+
+    isDeleted         Boolean             @default(false)
+    dateCreated       BigInt
+    dateUpdated       BigInt
+    GuardianToPatient GuardianToPatient[]
+}
+
+///{"modulePath": "src/modules/users"}
+model Patient {
+    patientId   String      @id @db.Char(40) /// {"size": 40}
+    patientType PatientType @default(CHRONIC)
+    patientCode Int         @unique @default(autoincrement())
+
+    pin      String?
+    isPinSet Boolean @default(false)
+
+    insuranceStatus InsuranceStatus?
+    copayAmount     Float?
+
+    userId String @unique
+    ///{"includeInCreate":true}
+    user   User   @relation(fields: [userId], references: [userId])
+
+    fatherName  String? /// {"dropdown": true}
+    husbandName String? /// {"size": 30}
+    passportNo  String? @db.Char(30) /// {"size": 30}
+    bloodGroup  String? @db.Char(30) /// {"size": 30}
+
+    // patient onBehaph caregiver
+    caregiverFirstName String?
+    caregiverLastName  String?
+    caregiverRelation  String?
+    caregiverMobile    String?
+
+    height Int?
+    age    Int?
+
+    hospitalNo    String  @unique @db.Char(40) /// {"size": 40}
+    externalHn    String? @db.Char(30) /// {"size": 30}
+    /// {"dropdown": true}
+    isDemoPatient Boolean @default(false)
+    termsAgreed   Boolean @default(false)
+    flag          Boolean @default(false)
+    doctorNotes   String? @db.VarChar(500) /// {"size": 500}
+
+    admissionStatus  AdmissionStatus  @default(NOT_ADMITTED)
+    activationStatus ActivationStatus @default(REFERRED)
+
+    isReferredMailSent Boolean @default(false)
+
+    medicareId String? @db.Char(40) /// {"size": 40}
+    memberId   String? @db.Char(40) /// {"size": 40}
+    groupNo    String? @db.Char(40) /// {"size": 40}
+
+    insurancePlanId String?        @db.Char(40)
+    insurancePlan   InsurancePlan? @relation(fields: [insurancePlanId], references: [insurancePlanId])
+
+    healthcareFacilityId String             @db.Char(40)
+    healthcareFacility   HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+
+    // for libre integration
+    librePatientId  String? @db.Char(40)
+    librePracticeId String? @db.Char(40)
+
+    dateCreated                 BigInt?
+    dateUpdated                 BigInt?
+    referralDate                BigInt?
+    ///{"includeInCreate":false}
+    rmsAdmissions               RMSAdmission[]
+    rmsOrder                    RMSOrder[]
+    patientResultableRanges     PatientResultableRange[]
+    orderableValues             OrderableValue[]
+    subjects                    RPMSubject[]
+    allergyToPatients           AllergyToPatient[]
+    eventLogs                   EventLogs[]
+    auditLogs                   AuditLogs[]
+    appSessionStates            AppSessionState[]
+    patientDeviceStates         PatientDeviceState[]
+    patientDeviceStateLogs      PatientDeviceStateLog[]
+    deviceHistories             DeviceInventoryHistory[]
+    patientDiagnosis            PatientToICD10Code[]
+    answerSheets                QUAnswerSheet[]
+    Reminders                   Reminder[]
+    DeviceInventory             DeviceInventory[]
+    Documents                   Document[]
+    GuardianToPatient           GuardianToPatient[]
+    Invoice                     Invoice[]
+    PatientProgressReport       PatientProgressReport[]
+    call                        Call[]
+    EmployeeActivityTime        EmployeeActivityTime[]
+    PracticePatient             PracticePatientAnnoucements[]
+    CommunicationLog            CommunicationLog[]
+    FlagToPatients              FlagToPatients[]
+    CommentToPatients           CommentToPatients[]
+    ExternalCommunicationRecord ExternalCommunicationRecord[]
+    announcementRegistery       AnnouncementRegistery[]
+    activationStatuses          ActivationStatusHistory[]
+}
+
+model ActivationStatusHistory {
+    activationStatusHistoryId String           @id @db.Char(40)
+    patient                   Patient          @relation(fields: [patientId], references: [patientId])
+    patientId                 String           @db.Char(40)
+    newStatus                 ActivationStatus
+    // createdBy                 Employee?        @relation(fields: [employeeId], references: [employeeId])
+    // employeeId                String?
+    dateCreated               BigInt
+}
+
+model FlagToPatients {
+    flagToPatientId String      @id @db.Char(40)
+    Patient         Patient?    @relation(fields: [patientId], references: [patientId])
+    patientId       String?     @db.Char(40)
+    userCreated     User?       @relation("userCreated", fields: [userCreatedId], references: [userId])
+    userCreatedId   String?     @db.Char(40)
+    userResolve     User?       @relation("userResolve", fields: [userResolveId], references: [userId])
+    userResolveId   String?     @db.Char(40)
+    comment         String?     @db.Text
+    resolutionDate  BigInt?
+    issueStatus     IssueStatus
+    issueDetail     String      @db.Text
+    issueType       FlagStatus
+    preferTime      PreferTime?
+    audioUrl        String?
+    dateCreated     BigInt
+    dateUpdated     BigInt
+}
+
+model CommentToPatients {
+    commentToPatientId String   @id @db.Char(40)
+    comment            String   @db.Text
+    patient            Patient  @relation(fields: [patientId], references: [patientId])
+    patientId          String   @db.Char(40)
+    employee           Employee @relation(fields: [employeeId], references: [employeeId])
+    employeeId         String   @db.Char(40)
+
+    employeeActivityTime   EmployeeActivityTime? @relation(fields: [employeeActivityTimeId], references: [employeeServiceTimeId])
+    employeeActivityTimeId String?               @unique @db.Char(40)
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+enum PreferTime {
+    MORNING
+    AFTERNOON
+    EVENING
+    ANYTIME
+}
+
+enum IssueStatus {
+    RESOLVED
+    UNRESOLVED
+}
+
+enum FlagStatus {
+    APP
+    DEVICE
+    READINGS
+    OTHER
+    SUGGESTIONS
+}
+
+enum EmailFaxTypes {
+    FINANCIAL_FAX
+    FINANCIAL_EMAIL
+
+    PRACTICE_FAX
+    PRACTICE_EMAIL
+}
+
+model Designation {
+    designationId         String                  @id @db.Char(40)
+    name                  String
+    dateCreated           BigInt
+    dateUpdated           BigInt
+    EmployeeToDesignation EmployeeToDesignation[]
+}
+
+model EmployeeToDesignation {
+    EmployeeToDesignationId String      @id @db.Char(40) /// {"size": 40}
+    employee                Employee    @relation(fields: [employeeId], references: [employeeId])
+    employeeId              String      @db.Char(40)
+    designation             Designation @relation(fields: [designationId], references: [designationId])
+    designationId           String      @db.Char(40)
+}
+
+model GuardianToPatient {
+    guardianToPatientId String @id @db.Char(40)
+
+    guardianId String   @db.Char(40)
+    guardian   Guardian @relation(fields: [guardianId], references: [guardianId])
+
+    patientId String  @db.Char(40)
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    @@unique([guardianId, patientId])
+}
+
+model Document {
+    documentId String @id @db.Char(40)
+
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+    patientId String  @db.Char(40)
+
+    reminderInstance   ReminderInstance? @relation(fields: [reminderInstanceId], references: [reminderInstanceId])
+    reminderInstanceId String?           @db.Char(40)
+
+    employee   Employee? @relation(fields: [employeeId], references: [employeeId])
+    employeeId String?   @db.Char(40)
+
+    documentType DocumentType
+    info         String?      @db.Text
+    infoJson     Json?        @db.Json
+    pdfUrl       String?      @db.Text
+
+    invoice   Invoice? @relation(fields: [invoiceId], references: [invoiceId], onUpdate: Cascade, onDelete: Cascade)
+    invoiceId String?  @db.Char(40)
+
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    status Boolean @default(false)
+
+    answerSheets        QUAnswerSheet[]
+    documentToOrderable DocumentToOrderable[]
+}
+
+model DocumentToOrderable {
+    documentToOrderableId String @id @db.Char(40)
+
+    orderable   Orderable @relation(fields: [orderableId], references: [orderableId])
+    orderableId String    @db.Char(40)
+
+    document   Document @relation(fields: [documentId], references: [documentId])
+    documentId String   @db.Char(40)
+}
+
+model Role {
+    roleId String @id @default(uuid()) @db.Char(40)
+    name   String @unique
+
+    userRoles           UserRole[]
+    resourcePermissions ResourcePermission[]
+}
+
+model UserRole {
+    userRoleId String @id @db.Char(40) /// {"size": 40}
+
+    User   User   @relation(fields: [userId], references: [userId])
+    userId String @db.Char(40)
+
+    role   Role   @relation(fields: [roleId], references: [roleId])
+    roleId String @db.Char(40)
+}
+
+model ResourcePermission {
+    resourcePermissionId String @id @db.Char(40)
+
+    resourceName String
+    create       Boolean @default(false)
+    view         Boolean @default(false)
+
+    role   Role   @relation(fields: [roleId], references: [roleId])
+    roleId String @db.Char(40)
+}
+
+///{"modulePath": "src/modules/users"}
+model Employee {
+    employeeId String  @id @db.Char(40) /// {"size": 40}
+    employeeNo String? @unique @db.Char(20) /// {"size": 20}
+
+    nationalProviderNo          String
+    providerTransactionAccessNo String
+
+    showAnonymousData Boolean      @default(false)
+    employeeType      EmployeeType @default(PRACTICE_EMPLOYEE)
+
+    specialtyId String?    @db.Char(40) /// {"size": 40}
+    specialty   Specialty? @relation(fields: [specialtyId], references: [specialtyId])
+
+    userId                       String                         @unique @db.Char(40) /// {"size": 40}
+    ///{"includeInCreate":true, "required": false}
+    user                         User                           @relation(fields: [userId], references: [userId])
+    signature                    String                         @default("Null")
+    isDeleted                    Boolean                        @default(false)
+    dateCreated                  BigInt
+    dateUpdated                  BigInt
+    rmsOrders                    RMSOrder[]
+    rmsAdmissions                RMSAdmission[]
+    Subject                      RPMSubject[]
+    // auditLogs                    AuditLogs[]
+    favouriteCodes               EmployeeToICD10Code[]
+    healthcareFacilityToEmployee HealthcareFacilityToEmployee[]
+    HealthcareFacilityPOC        HealthcareFacility[]           @relation("poc")
+    HealthcareFacilityCHIPOCs    HealthcareFacility[]           @relation("chiPOC")
+    uSEscalationsHandledBy       USEscalation[]                 @relation("handledBy")
+    uSEscalationsOpenedBy        USEscalation[]                 @relation("openedBy")
+    ReminderInstance             ReminderInstance[]
+    Call                         Call[]
+    EmployeeActivityTime         EmployeeActivityTime[]
+    Annoucements                 Annoucements[]
+    EmployeeToDesignation        EmployeeToDesignation[]
+    // FlagToPatients               FlagToPatients[]               @relation("created")
+    // FlagToPatient                FlagToPatients[]               @relation("resolved")
+    CommentToPatients            CommentToPatients[]
+    Document                     Document[]
+    deviceInventoryHistory       DeviceInventoryHistory[]
+    announcementRegistery        AnnouncementRegistery[]
+    ExternalCommunicationRecord  ExternalCommunicationRecord[]
+}
+
+///{"modulePath": "src/modules/users"}
+model HealthcareFacilityToEmployee {
+    healthcareFacilityToEmployeeId String @id @db.Char(40)
+
+    employeeId String   @db.Char(40)
+    employee   Employee @relation(fields: [employeeId], references: [employeeId])
+
+    healthcareFacilityId String             @db.Char(40)
+    healthcareFacility   HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+}
+
+///{"modulePath": "src/modules/users"}
+model HealthcareFacility {
+    healthcareFacilityId String  @id @db.Char(40)
+    pocId                String? @db.Char(40)
+    chiPOCId             String? @db.Char(40)
+    tzOffset             Int     @default(-18000)
+
+    name                     String
+    phone                    String
+    taxpayerIdentificationNo String
+    email                    String?
+    fax                      String?
+
+    financialEmail String?
+    financialFax   String?
+    enableFax      Boolean? @default(false)
+    enableEmail    Boolean? @default(false)
+
+    address    String
+    city       String
+    postalCode String?
+    state      String?
+
+    // {smsEnabled: true, emailEnabled: false, units: {weight: "kg"/"lbs", temperature:"C"/"F"}}
+    settings String @db.Text
+
+    percentTax        Float?
+    discount          Float?
+    isPercentDiscount Boolean @default(false)
+
+    poc    Employee? @relation("poc", fields: [pocId], references: [employeeId])
+    chiPOC Employee? @relation("chiPOC", fields: [chiPOCId], references: [employeeId])
+
+    healthcareFacilityToEmployee HealthcareFacilityToEmployee[]
+    rmsAdmissions                RMSAdmission[]
+
+    isDeleted                       Boolean                           @default(false)
+    dateCreated                     BigInt
+    dateUpdated                     BigInt
+    PatientRecruitment              PatientRecruitment[]
+    Invoice                         Invoice[]
+    Patient                         Patient[]
+    HealthcareFacilityInvoice       HealthcareFacilityInvoice[]
+    Call                            Call[]
+    PracticePatient                 PracticePatientAnnoucements[]
+    healthcareFacilityToCPTCode     healthcareFacilityToCPTCode[]
+    externalCommunicationRecord     ExternalCommunicationRecord[]
+    healthcareFacilityToFaxesEmails HealthcareFacilityToFaxesEmails[]
+    announcementRegistery           AnnouncementRegistery[]
+}
+
+model HealthcareFacilityToFaxesEmails {
+    healthcareFacilityToFaxesEmailsId String @id @db.Char(40)
+
+    healthcareFacility   HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+    healthcareFacilityId String             @db.Char(40)
+
+    email String?
+    fax   String?
+
+    emailFaxType EmailFaxTypes
+}
+
+///{"modulePath": "src/modules/orderables/vitals"}
+model Orderable {
+    orderableId  String  @id @db.Char(40) /// {"size": 40}
+    // {"values": ["Blood Pressure", "Temperature", ""]}
+    name         String  @unique @db.Char(40) /// {"size": 40, "dropdown":true}
+    abbr         String? @db.Char(30) /// {"size": 10}
+    icon         String? @db.Char(200) /// {"size": 200}
+    times        String?
+    instructions String?
+
+    orderableType OrderableType
+    // deviceModels  DeviceModel[]
+
+    rmsOrders       RMSOrder[]
+    orderableValues OrderableValue[]
+
+    // //Default values of orderable while configuring the orderable in seed data
+    // alertGap              Int     @default(0)
+    // orderableInstructions String?
+    // graceTime             BigInt  @default(0)
+
+    // repeatAfter    Int
+    // repeatTimeUnit RepeatTimeUnit
+
+    // frequency Int @default(-1)
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    orderableToResultable    OrderableToResultable[]
+    subjects                 RPMSubject[]
+    rmsScheduleInstances     RMSScheduleInstance[]
+    eventLogs                EventLogs[]
+    qUQuestionnaires         QUQuestionnaire[]
+    EscalationGraphOrderable EscalationGraphOrderable[]
+    TrainingMaterial         TrainingMaterial[]
+    DocumentToOrderable      DocumentToOrderable[]
+}
+
+///{"modulePath": "src/modules/orderables/vitals"}
+model Resultable {
+    resultableId String @id @db.Char(40) /// {"size": 40}
+
+    name String //Systolic, Distolic
+    key  String
+    abbr String
+
+    dataType      ResultableDataType
+    resultUnit    String?
+    icon          String?
+    warnLow       Float?
+    normalLow     Float?
+    normalHigh    Float?
+    warnHigh      Float?
+    minErrorValue Float?
+    maxErrorValue Float?
+    abnormalLow   Float?
+    abnormalHigh  Float?
+
+    order       Int     @default(300)
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    // orderables              Orderable[]
+    // deviceModels            DeviceModel[]
+    patientResultableRanges PatientResultableRange[]
+    resultableValues        ResultableValue[]
+    orderableToResultable   OrderableToResultable[]
+    deviceModelToResultable DeviceModelToResultable[]
+    RMSOrderToResultable    RMSOrderToResultable[]
+}
+
+///{"modulePath": "src/modules/orderables/vitals"}
+model OrderableToResultable {
+    orderableToResultableId String @id @db.Char(40) /// {"size": 40}
+
+    orderableId String    @db.Char(40)
+    orderable   Orderable @relation(fields: [orderableId], references: [orderableId])
+
+    ///{"dropdown":true}
+    resultable   Resultable @relation(fields: [resultableId], references: [resultableId])
+    resultableId String     @db.Char(40)
+}
+
+///{"modulePath": "src/modules/orderables/vitals"}
+model OrderableValue {
+    orderableValueId String @id @db.Char(40) /// {"size": 40}
+
+    orderableId String    @db.Char(40)
+    orderable   Orderable @relation(fields: [orderableId], references: [orderableId])
+
+    rmsAdmission   RMSAdmission? @relation(fields: [rmsAdmissionId], references: [rmsAdmissionId])
+    rmsAdmissionId String?       @db.Char(40)
+
+    rmsScheduleInstanceId String?              @unique @db.Char(40)
+    rmsScheduleInstance   RMSScheduleInstance? @relation(fields: [rmsScheduleInstanceId], references: [rmsScheduleInstanceId])
+
+    patientId String  @db.Char(40)
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    deviceInventoryId String?          @db.Char(40)
+    deviceInventory   DeviceInventory? @relation(fields: [deviceInventoryId], references: [deviceInventoryId])
+
+    rmsOrder   RMSOrder? @relation(fields: [rmsOrderId], references: [rmsOrderId])
+    rmsOrderId String?   @db.Char(40)
+
+    observationTime BigInt?
+    acquisitionTime BigInt?
+    captureTime     BigInt?
+    readingTime     BigInt?
+
+    status      OrderableStatus      @default(UNHANDLED)
+    colorStatus OrderableColorStatus @default(NORMAL)
+    isValid     Boolean              @default(true)
+    isManual    Boolean              @default(false)
+    isLibre     Boolean              @default(false)
+
+    isLive Boolean @default(false)
+    cmFile String? @db.Char(255)
+
+    comments             String?         @db.Text
+    liveOrderableValueId String?         @db.Char(40)
+    liveOrderableValue   OrderableValue? @relation("LiveOrderableValue", fields: [liveOrderableValueId], references: [orderableValueId])
+
+    liveOrderableValues OrderableValue[] @relation("LiveOrderableValue")
+
+    ///{"includeInCreate": true}
+    resultableValues ResultableValue[]
+    subjects         RPMSubject[]
+    USEscalation     USEscalation[]
+}
+
+///{"modulePath": "src/modules/orderables/vitals"}
+model ResultableValue {
+    resultableValueId String @id
+
+    orderableValueId String         @db.Char(40)
+    orderableValue   OrderableValue @relation(fields: [orderableValueId], references: [orderableValueId])
+
+    resultableId String     @db.Char(40)
+    resultable   Resultable @relation(fields: [resultableId], references: [resultableId])
+
+    medication   Medication? @relation(fields: [medicationId], references: [medicationId])
+    medicationId String?     @db.Char(40)
+
+    numericValue Float?
+    textValue    String?
+    dataValue    String?           @db.MediumText
+    fileUrls     String?           @db.VarChar(500)
+    status       ResultableStatus?
+}
+
+// ///{"modulePath": "src/modules/orderables/vitals"}
+// model ResultableRange {
+//     resultableRangeId String @id @db.Char(40) /// {"size": 40}
+//     gender            Gender
+//     minAge            Int
+//     maxAge            Int
+//     warnLow           Float
+//     normalLow         Float
+//     normalHigh        Float
+//     warnHigh          Float
+//     minValue          Float
+//     maxValue          Float
+
+//     resultableId String     @db.Char(40) /// {"size": 40}
+//     resultable   Resultable @relation(fields: [resultableId], references: [resultableId])
+// }
+
+// Class PatientResultableRange
+///{"modulePath": "src/modules/orderables/vitals"}
+model PatientResultableRange {
+    patientResultableRangeId String @id @db.Char(40) /// {"size": 40}
+
+    patientId String  @db.Char(40) /// {"size": 40}
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    resultableId String
+    resultable   Resultable @relation(fields: [resultableId], references: [resultableId])
+
+    warnLow      Float
+    normalLow    Float
+    normalHigh   Float
+    warnHigh     Float
+    minValue     Float
+    maxValue     Float
+    abnormalLow  Float?
+    abnormalHigh Float?
+}
+
+// -- every resultable associated with device should be associated with orderable (that is also associated with device)
+// -- for every orderable associated with device (alteast its one resultable should be associated with device)
+// We can have a device which does CBC(WBC, RBC) and SPO2(Spo2), another device which does CBC(WBC, HB) and BP(systolic, distolic)
+// A business constaint should be that the device contains at least one resultable of the orderable(s) it is assinged.
+
+///{"modulePath": "src/modules/admission"}
+model RMSAdmission {
+    rmsAdmissionId String  @id @db.Char(40) /// {"size": 40}
+    admissionDate  BigInt
+    dischargeDate  BigInt?
+
+    primaryDoctorId String   @db.Char(40)
+    primaryDoctor   Employee @relation(fields: [primaryDoctorId], references: [employeeId])
+
+    patientId String  @db.Char(40) /// {"size": 40}
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    isPinned    Boolean @default(false)
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    ///{"includeInCreate":true}
+    rmsAdmissionCaregivers RMSAdmissionCaregiver[]
+    rmsOrders              RMSOrder[]
+
+    healthcareFacilityId String             @db.Char(40)
+    healthcareFacility   HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+    OrderableValue       OrderableValue[]
+}
+
+// SPECS: Should not carry on before or after admission
+// SPECS: Date started should be when doctor is assigned
+// SPECS: At date of discharge, All admission-doctors should be closed. 
+///{"modulePath": "src/modules/admission"}
+model RMSAdmissionCaregiver {
+    rmsAdmissionCaregiverId String @id @db.Char(40)
+
+    rmsAdmissionId String       @db.Char(40) /// {"size": 40}
+    rmsAdmission   RMSAdmission @relation(fields: [rmsAdmissionId], references: [rmsAdmissionId])
+
+    caregiverId String @db.Char(40) /// {"size": 40}
+    caregiver   User   @relation(fields: [caregiverId], references: [userId])
+
+    isPrimary Boolean @default(false)
+
+    dateStarted BigInt
+    dateStopped BigInt?
+
+    isDeleted Boolean @default(false)
+}
+
+///{"modulePath": "src/modules/admission"}
+model RMSOrder {
+    rmsOrderId String @id @db.Char(40) /// {"size": 40}
+
+    orderType    OrderType
+    isContinuous Boolean   @default(false)
+
+    rmsAdmissionId String?       @db.Char(40)
+    rmsAdmission   RMSAdmission? @relation(fields: [rmsAdmissionId], references: [rmsAdmissionId])
+
+    patientId String  @db.Char(40) /// {"size": 40}
+    patient   Patient @relation(fields: [patientId], references: [patientId]) // Case: For Creating RMSOrder Directly Without Admission
+
+    orderableId String    @db.Char(40)
+    orderable   Orderable @relation(fields: [orderableId], references: [orderableId])
+
+    medicationId String?     @db.Char(40)
+    medication   Medication? @relation(fields: [medicationId], references: [medicationId])
+
+    icd10Code   ICD10Code? @relation(fields: [iCD10CodeId], references: [icd10CodeId])
+    iCD10CodeId String?    @db.Char(40)
+
+    orderById String   @db.Char(40)
+    orderBy   Employee @relation(fields: [orderById], references: [employeeId])
+
+    pillboxSlot       Int?
+    deviceInventoryId String?          @db.Char(40)
+    deviceInventory   DeviceInventory? @relation(fields: [deviceInventoryId], references: [deviceInventoryId])
+
+    alertGap  Int @default(600) //10min, may be from master settings
+    graceTime Int @default(1800) //30min, from master settings
+
+    ///{"includeInCreate":true}
+    rmsSchedules RMSSchedule[]
+
+    isDeleted            Boolean                @default(false)
+    dateCreated          BigInt
+    dateUpdated          BigInt
+    RMSOrderToResultable RMSOrderToResultable[]
+    OrderableValue       OrderableValue[]
+}
+
+///{"modulePath": "src/modules/admission"}
+model RMSOrderToResultable {
+    rmsOrderToResultableId String @id @db.Char(40) /// {"size": 40}
+
+    rmsOrder   RMSOrder @relation(fields: [rmsOrderId], references: [rmsOrderId])
+    rmsOrderId String   @db.Char(40)
+
+    resultable   Resultable @relation(fields: [resultableId], references: [resultableId])
+    resultableId String     @db.Char(40)
+}
+
+///{"modulePath": "src/modules/admission"}
+model RMSSchedule {
+    rmsScheduleId String @id @db.Char(40) /// {"size": 40}
+
+    rmsOrderId String   @db.Char(40)
+    rmsOrder   RMSOrder @relation(fields: [rmsOrderId], references: [rmsOrderId])
+
+    medicationQuantity Float?
+
+    // ----------SCHEDULE INFO START--------------
+    startTime   BigInt
+    endTime     BigInt
+    repeatValue Int
+    repeatUnit  RepeatTimeUnit
+
+    // frequency     Int            @default(-1)
+    // nextStartTime BigInt         @default(0)
+    // ----------SCHEDULE INFO END--------------
+
+    rmsScheduleInstances RMSScheduleInstance[]
+}
+
+///{"modulePath": "src/modules/admission"}
+model RMSScheduleInstance {
+    rmsScheduleInstanceId String @id @db.Char(40)
+
+    rmsScheduleId String      @db.Char(40)
+    rmsSchedule   RMSSchedule @relation(fields: [rmsScheduleId], references: [rmsScheduleId])
+
+    dueTime        BigInt
+    // dueEndTime    BigInt
+    // nextAlertTime BigInt  @default(0)
+    // alertCount    Int     @default(0)
+    processed      Boolean         @default(false)
+    taken          Boolean         @default(false)
+    // missed          Boolean          @default(false)
+    orderableValue OrderableValue?
+
+    orderable   Orderable @relation(fields: [orderableId], references: [orderableId])
+    orderableId String    @db.Char(40) //Added to facilitate the compliance detail query for orderables
+
+    medication   Medication? @relation(fields: [medicationId], references: [medicationId])
+    medicationId String?     @db.Char(40) //Added to facilitate the compliance detail query for medications
+}
+
+// There are 3 cases of subject creation
+// 1. Admission Subject (orderable and orderableValue both would be null) GENERAL
+// 2. RMSOrder assigned/changed/delted (orderableValue would be null)  ORDER_CHANGED
+// 3. Escallation both orderableValue and orderable would be non-null. ESCALATION STATE(S)
+// 4. On Patient Creation handover sheet
+///{"modulePath": "src/modules/messages"}
+model RPMSubject {
+    rpmSubjectId String @id @db.Char(40)
+    title        String
+
+    orderableValueId String?         @db.Char(40)
+    orderableValue   OrderableValue? @relation(fields: [orderableValueId], references: [orderableValueId])
+
+    orderable   Orderable? @relation(fields: [orderableId], references: [orderableId])
+    orderableId String?    @db.Char(40)
+
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+    patientId String  @db.Char(40)
+
+    ownerId String? @db.Char(40) //would be null for System generated subjects 
+    owner   User?   @relation(fields: [ownerId], references: [userId])
+
+    escalatedTo   Employee? @relation(fields: [escalatedToId], references: [employeeId])
+    escalatedToId String?   @db.Char(40)
+
+    messageWorkflow MessageWorkflow @default(GENERAL)
+    messages        RPMMessage[]
+    subjectUsers    UserSubject[]
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    handoverSheetStatus HandOverSheetStatus?
+    totalCallTime       BigInt?
+}
+
+///{"modulePath": "src/modules/messages"}
+model RPMMessage {
+    rpmMessageId String @id @db.Char(40)
+
+    rpmSubjectId String     @db.Char(40)
+    rpmSubject   RPMSubject @relation(fields: [rpmSubjectId], references: [rpmSubjectId])
+
+    messageType     MessageContentType
+    messageText     String?            @db.Text
+    messageUrl      String?
+    messageDuration Float?
+    copyToPatient   Boolean
+
+    senderId String? @db.Char(40) //In case of system generated would be null
+    sender   User?   @relation(fields: [senderId], references: [userId])
+
+    userMessages UserMessage[]
+
+    isRead Boolean @default(false)
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+///{"modulePath": "src/modules/messages"}
+model UserSubject {
+    userSubjectId String @id @db.Char(40)
+    user          User   @relation(fields: [userId], references: [userId])
+    userId        String @db.Char(40)
+
+    subject   RPMSubject @relation(fields: [subjectId], references: [rpmSubjectId])
+    subjectId String     @db.Char(40)
+}
+
+///{"modulePath": "src/modules/messages"}
+model UserMessage {
+    messageStatusId String @id @db.Char(40)
+
+    message   RPMMessage @relation(fields: [messageId], references: [rpmMessageId])
+    messageId String     @db.Char(40)
+
+    user   User   @relation(fields: [userId], references: [userId])
+    userId String @db.Char(40)
+
+    isRead Boolean @default(false)
+
+    messageDeliveryStatus MessageDeliveryStatus @default(SENT)
+}
+
+///{"modulePath": "src/modules/devices"}
+model Manufacturer {
+    manufacturerId String        @id @db.Char(40) /// {"size": 40}
+    manufacturer   String
+    isDeleted      Boolean       @default(false)
+    dateCreated    BigInt
+    dateUpdated    BigInt
+    deviceModels   DeviceModel[]
+    Medication     Medication[]
+}
+
+///{"modulePath": "src/modules/devices"}
+model DeviceType {
+    deviceTypeId String        @id @db.Char(40) /// {"size": 40}
+    deviceType   String
+    isDeleted    Boolean       @default(false)
+    dateCreated  BigInt
+    dateUpdated  BigInt
+    deviceModels DeviceModel[]
+}
+
+enum DeviceCommProtocol {
+    BLUETOOTH
+    GSM
+    WIFI
+}
+
+///{"modulePath": "src/modules/devices"}
+model DeviceModel {
+    deviceModelId     String             @id @db.Char(40) /// {"size": 40}
+    deviceModel       String             @unique
+    commProtocol      DeviceCommProtocol @default(BLUETOOTH)
+    modelCode         String
+    deviceAbbr        String?
+    deviceIcon        String?
+    supportMultiple   Boolean            @default(false)
+    supportContinuous Boolean            @default(false)
+    instructions      String?            @db.VarChar(3000)
+    instructionVideo  String?            @db.VarChar(300)
+
+    manufacturerId String       @db.Char(40)
+    manufacturer   Manufacturer @relation(fields: [manufacturerId], references: [manufacturerId])
+
+    deviceTypeId String     @db.Char(40)
+    deviceType   DeviceType @relation(fields: [deviceTypeId], references: [deviceTypeId])
+
+    orderThreshold       Int @default(30)
+    defaultOrderQuantity Int @default(50)
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    devices                 DeviceInventory[]
+    deviceModelToResultable DeviceModelToResultable[]
+    deviceReceival          DeviceReceival[]
+    deviceOrder             DeviceOrder[]
+}
+
+///{"modulePath": "src/modules/devices"}
+model DeviceModelToResultable {
+    deviceModelToResultableId String @id @db.Char(40)
+
+    resultableId String     @db.Char(40)
+    resultable   Resultable @relation(fields: [resultableId], references: [resultableId])
+
+    deviceModelId String      @db.Char(40)
+    deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [deviceModelId])
+}
+
+///{"modulePath": "src/modules/devices"}
+model DeviceInventory {
+    deviceInventoryId String @id @db.Char(40)
+
+    deviceUniqueCode String  @unique
+    deviceIOSCode    String?
+
+    deviceModelId String      @db.Char(40)
+    deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [deviceModelId])
+    deviceCode    String      @unique
+
+    rmsOrders     RMSOrder[]
+    deviceHistory DeviceInventoryHistory[]
+
+    deviceStatus DeviceStatus @default(AVAILABLE)
+
+    isFaulty   Boolean @default(false)
+    isAssigned Boolean @default(false)
+
+    patientId String?  @db.Char(40)
+    patient   Patient? @relation(fields: [patientId], references: [patientId])
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    orderableValues        OrderableValue[]
+    patientDeviceState     PatientDeviceState?
+    patientDeviceStateLogs PatientDeviceStateLog[]
+}
+
+model DeviceReceival {
+    deviceReceivalId String @id @db.Char(40)
+
+    addedById String @db.Char(40)
+    addedBy   User   @relation(fields: [addedById], references: [userId])
+
+    deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [deviceModelId])
+    deviceModelId String      @db.Char(40)
+
+    deviceOrderType DeviceOrderType @default(INVENTORY_ADDED)
+
+    quantity    Int
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+model DeviceOrder {
+    deviceOrderId String @id @db.Char(40)
+
+    orderById String @db.Char(40)
+    orderBy   User   @relation(fields: [orderById], references: [userId])
+
+    deviceModel   DeviceModel @relation(fields: [deviceModelId], references: [deviceModelId])
+    deviceModelId String      @db.Char(40)
+
+    deviceOrderType DeviceOrderType @default(ORDER)
+
+    orderedQuantity Int
+    Status          String
+    dateCreated     BigInt
+    dateUpdated     BigInt
+}
+
+///{"modulePath": "src/modules/devices"}
+model DeviceInventoryHistory {
+    deviceInventoryHistoryId String          @id @db.Char(40)
+    deviceInventory          DeviceInventory @relation(fields: [deviceInventoryId], references: [deviceInventoryId])
+    deviceInventoryId        String          @db.Char(40)
+
+    deviceStatus DeviceStatus @default(AVAILABLE)
+
+    employee   Employee? @relation(fields: [employeeId], references: [employeeId])
+    employeeId String?   @db.Char(40)
+
+    patientId String?  @db.Char(40)
+    patient   Patient? @relation(fields: [patientId], references: [patientId])
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+    User        User?   @relation(fields: [userUserId], references: [userId])
+    userUserId  String? @db.Char(40)
+}
+
+enum ExternalCommunicationPlatforms {
+    SMS
+
+    EMAIL
+
+    FAX
+}
+
+enum emailSentTo {
+    PATIENT
+
+    HEALTHCARE_FACILITY
+}
+
+//email SMS and Faxes from system.
+model ExternalCommunicationRecord {
+    externalCommunicationRecordId String @id @db.Char(40)
+
+    communicationMethod  CommunicationMethod
+    subject              String
+    user                 User?               @relation(fields: [sentById], references: [userId])
+    sentById             String?             @db.Char(40)
+    patient              Patient?            @relation(fields: [patientId], references: [patientId])
+    patientId            String?             @db.Char(40)
+    employee             Employee?           @relation(fields: [employeeId], references: [employeeId])
+    employeeId           String?             @db.Char(40)
+    healthcarefacility   HealthcareFacility  @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+    healthcareFacilityId String              @db.Char(40)
+
+    communicationSentTo CommunicationSentTo
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+enum CommunicationSentTo {
+    PATIENT
+
+    HEALTHCARE_FACILITY
+
+    EMPLOYEE
+}
+
+// enum ServiceType {
+//     ESCALATION
+//     TELECONSULT
+//     NURSE_VISIT
+//     REMOTE_MONITORING
+//     SYMPTOM_CHECKER
+// }
+
+// enum ServiceUnit {
+//     QUANTITIY
+//     TIME_INTERVAL
+// }
+
+// enum SubscriptionTimeUnitEnum {
+//     DAY
+//     WEEK
+//     MONTH
+//     YEAR
+// }
+
+// Class BillableService
+///{"modulePath": "src/modules/billing"}
+// model BillableService {
+//     serviceId    String          @id @db.Char(40) /// {"size": 40}
+//     serviceType  ServiceType
+//     linkRecordId String?
+//     serviceUnit  ServiceUnitEnum
+//     servicePrice Float           @default(0)
+// }
+
+// // Class Subscription
+// ///{"modulePath": "src/modules/billing"}
+// model Subscription {
+//     subscriptionId String   @id @db.Char(40) /// {"size": 40}
+//     patientId      String
+//     validity       DateTime @default(now())
+// }
+
+// // Class SubscriptionItem
+// ///{"modulePath": "src/modules/billing"}
+// model SubscriptionItem {
+//     subscriptionItemId  String                   @id @db.Char(40) /// {"size": 40}
+//     subscriptionId      String
+//     billableServiceId   String
+//     servicePrice        Float                    @default(0)
+//     quantity            Int
+//     serviceUnit         ServiceUnitEnum
+//     maxUseCount         Int
+//     perTimeInterval     DateTime                 @default(now())
+//     perTimeIntervalUnit SubscriptionTimeUnitEnum
+// }
+
+///{"modulePath": "src/modules/orderables"}
+
+///{"modulePath": "src/modules/orderables/medications"}
+model MedicationRoute {
+    medicationRouteId String       @id @db.Char(40)
+    name              String       @unique
+    Medication        Medication[]
+}
+
+///{"modulePath": "src/modules/orderables/medications"}
+model DosageUnit {
+    dosageUnitId String       @id @db.Char(40)
+    name         String       @unique
+    Medication   Medication[]
+}
+
+///{"modulePath": "src/modules/orderables/medications"}
+model DosageForm {
+    dosageFormId      String       @id @db.Char(40)
+    name              String       @unique
+    image             String?
+    isInsulin         Boolean      @default(false) //?? should be in meds
+    isInsulinCombined Boolean      @default(false) //??
+    Medication        Medication[]
+}
+
+///{"modulePath": "src/modules/orderables/medications"}
+model Medication {
+    medicationId String  @id @db.Char(40)
+    name         String
+    genericName  String? @db.LongText
+    image        String?
+    packageImage String?
+    strength     String?
+    frequency    String?
+    times        String?
+    instructions String?
+
+    medicationRouteId String?          @db.Char(40)
+    medicationRoute   MedicationRoute? @relation(fields: [medicationRouteId], references: [medicationRouteId])
+
+    dosageFormId String?     @db.Char(40)
+    dosageForm   DosageForm? @relation(fields: [dosageFormId], references: [dosageFormId])
+
+    dosageUnitId String?     @db.Char(40)
+    dosageUnit   DosageUnit? @relation(fields: [dosageUnitId], references: [dosageUnitId])
+
+    manufacturerId      String?               @db.Char(40)
+    manufacturer        Manufacturer?         @relation(fields: [manufacturerId], references: [manufacturerId])
+    RMSOrder            RMSOrder[]
+    RMSScheduleInstance RMSScheduleInstance[]
+    ResultableValue     ResultableValue[]
+}
+
+///{"modulePath": "src/modules/users/patient-info"}
+model Allergy {
+    allergyId         String             @id @db.Char(40)
+    name              String             @unique
+    allergyToPatients AllergyToPatient[]
+}
+
+///{"modulePath": "src/modules/users/patient-info"}
+model AllergyToPatient {
+    allergyToPatientId String @id @db.Char(40)
+
+    ///{"includeInCreate": false}
+    allergy   Allergy @relation(fields: [allergyId], references: [allergyId])
+    allergyId String  @db.Char(40)
+
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+    patientId String  @db.Char(40)
+
+    @@unique([allergyId, patientId])
+}
+
+model EventLogs {
+    eventLogId String @id @db.Char(40)
+    eventTime  BigInt
+
+    patientId String  @db.Char(40)
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    orderableId String?    @db.Char(40)
+    orderable   Orderable? @relation(fields: [orderableId], references: [orderableId])
+
+    userId String? @db.Char(40)
+    user   User?   @relation(fields: [userId], references: [userId])
+
+    eventLogType EventLogType
+
+    startTime BigInt
+    endTime   BigInt
+}
+
+model AuditLogs {
+    auditLogsId String @id @db.Char(40)
+    auditTime   BigInt
+
+    userId String? @db.Char(40)
+    user   User?   @relation(fields: [userId], references: [userId])
+
+    patientId String?  @db.Char(40)
+    patient   Patient? @relation(fields: [patientId], references: [patientId])
+
+    module     AuditModuleType
+    actionType ActionsType
+
+    message String @db.Text
+}
+
+model BillableEventReport {
+    billableEventReportId String @id @db.Char(40)
+
+    generatedById String @db.Char(40)
+    user          User   @relation(fields: [generatedById], references: [userId])
+
+    generatedOn BigInt
+    startTime   BigInt
+    endTime     BigInt
+}
+
+model ICD10Code {
+    icd10CodeId String @id @db.Char(40)
+
+    icd10Code   String @db.Char(40)
+    description String
+
+    parentId String?    @db.Char(40)
+    parent   ICD10Code? @relation("Children", fields: [parentId], references: [icd10CodeId])
+
+    isLeaf Boolean
+    level  Int
+
+    isDeleted   Boolean @default(false)
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    children                     ICD10Code[]                   @relation("Children")
+    EmployeeToICD10Codes         EmployeeToICD10Code[]
+    PatientToICD10Codes          PatientToICD10Code[]
+    RMSOrder                     RMSOrder[]
+    QUQuestionnaireToICD10Code   QUQuestionnaireToICD10Code[]
+    answerSheets                 QUAnswerSheet[]
+    reminderInstanceToICD10Codes ReminderInstanceToICD10Code[]
+}
+
+///{"modulePath": "src/modules/ICD10Code"}
+model EmployeeToICD10Code {
+    employeeToICD10CodeId String @id @db.Char(40) /// {"size": 40}
+    icd10CodeId           String @db.Char(40)
+    employeeId            String @db.Char(40)
+
+    employee  Employee  @relation(fields: [employeeId], references: [employeeId])
+    iCD10Code ICD10Code @relation(fields: [icd10CodeId], references: [icd10CodeId])
+}
+
+///{"modulePath": "src/modules/ICD10Code"}
+model PatientToICD10Code {
+    patientToICD10CodeId String @id @db.Char(40) /// {"size": 40}
+    icd10CodeId          String @db.Char(40)
+    addedById            String @db.Char(40)
+    patientId            String @db.Char(40)
+
+    addedBy   User      @relation(fields: [addedById], references: [userId])
+    patient   Patient   @relation(fields: [patientId], references: [patientId])
+    iCD10Code ICD10Code @relation(fields: [icd10CodeId], references: [icd10CodeId])
+
+    comments String? @db.Text()
+
+    startTime BigInt?
+    endTime   BigInt?
+
+    isActive  Boolean @default(true)
+    isDeleted Boolean @default(false)
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+enum SessionEventTypes {
+    AppInstalled
+    LoggedIn
+    LoggedOut
+    PhoneStarted
+    PhoneShutdown
+    UIAppStarted
+    UIAppStopped
+    SvcAppStarted
+    SvcAppStopped
+    PmsStarted
+    PmsStopped
+    DmsStarted
+    DmsStopped
+    BtEnabled
+    BtDisabled
+    InetEnabled
+    InetDisabled
+    Location
+    LocEnabled
+    LocDisabled
+    Battery
+    BatteryNormal
+    BatteryCritical
+    AppVersion
+    DV_GetAdmissionDevices
+    DV_LocalDBUpdated
+    DV_ReadDB
+    DV_RetrieveKnownPeripheral
+    DV_UnpairDevice
+    DV_CallConnectOnPeripheral
+    DV_PeripheralConnected
+    DV_PeripheralDisconnected
+    GoingToBackground
+    GoingToForeground
+    WillBeTerminated
+    ScanningStarted
+    DV_Discovered
+    ForgettingPatientDetails
+    AppWoken
+    Generic
+}
+
+enum SessionEventFrom {
+    PMS
+    SvcApp
+    App
+    UIApp
+    DMS
+    Monitor
+    BTC
+    Scanner
+    DeviceHandler
+}
+
+enum MonitoringEventTypes {
+    MedicalDevice
+}
+
+enum MobileOS {
+    Android
+    iOS
+}
+
+enum MonitoringEventFrom {
+    Service
+    Monitor
+    Device
+}
+
+enum AppSessionStatus {
+    Offline
+    Online
+    LoggedOut
+}
+
+enum DocumentType {
+    MONTHLY_REPORT
+    FOLLOW_UP_REPORT
+    HANDOVER_SHEET
+    ALERT_REPORT
+    MISSED_CALL_LOGS
+    READINGS_REPORT
+    ESCALATION_SUMMARY
+
+    LIBRE_REPORT
+
+    PRE_AUTHORIZATION
+    CARE_PLAN
+}
+
+model AppSessionState {
+    appSessionStateId String @id @db.Char(40)
+
+    userDeviceId String     @db.Char(40)
+    userDevice   UserDevice @relation(fields: [userDeviceId], references: [userDeviceId])
+
+    patientId String  @db.Char(40)
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    status           AppSessionStatus?
+    battery          Int?
+    bluetoothEnabled Boolean           @default(false)
+    appVersion       String?           @db.Char(32)
+
+    appSessionStateLogs AppSessionStateLog[]
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+model AppSessionStateLog {
+    appSessionStateLogId String @id @db.Char(40)
+
+    appSessionStateId String          @db.Char(40)
+    appSessionState   AppSessionState @relation(fields: [appSessionStateId], references: [appSessionStateId])
+
+    eventTime BigInt
+
+    eventType SessionEventTypes
+    eventFrom SessionEventFrom
+
+    eventData     String?            @db.Char(164)
+    stateFrom     SessionEventTypes?
+    mobileOs      MobileOS?
+    stateDuration BigInt?
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+model PatientDeviceState {
+    deviceId String          @id @db.Char(40)
+    device   DeviceInventory @relation(fields: [deviceId], references: [deviceInventoryId])
+
+    patientId String  @db.Char(40)
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    stateTime BigInt
+    eventType MonitoringEventTypes
+    eventFrom MonitoringEventFrom
+
+    isConnected Boolean
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+model PatientDeviceStateLog {
+    patientDeviceStateLogId String @id @db.Char(40)
+
+    deviceId String          @db.Char(40)
+    device   DeviceInventory @relation(fields: [deviceId], references: [deviceInventoryId])
+
+    patientId String  @db.Char(40)
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    stateTime BigInt
+    eventType MonitoringEventTypes //
+    eventFrom MonitoringEventFrom
+
+    isConnected Boolean
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+///{"modulePath": "src/modules/reminder"}
+model Reminder {
+    reminderId String @id @db.Char(40)
+
+    title   String
+    notes   String? // make sure length
+    isAdHoc Boolean @default(false)
+
+    patientId String?  @db.Char(40)
+    patient   Patient? @relation(fields: [patientId], references: [patientId])
+
+    ownerId String @db.Char(40)
+    owner   User   @relation(fields: [ownerId], references: [userId])
+
+    reminderTypeId String?       @db.Char(40)
+    reminderType   ReminderType? @relation(fields: [reminderTypeId], references: [reminderTypeId])
+
+    // ----------SCHEDULE INFO START--------------
+    startDate Int @db.UnsignedInt
+    endDate   Int @db.UnsignedInt
+
+    startTime Int //sec
+    endTime   Int //sec
+
+    repeatValue Int
+    repeatUnit  RepeatTimeUnit
+
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    reminderInstances ReminderInstance[]
+    reminderUsers     ReminderUser[]
+}
+
+///{"modulePath": "src/modules/reminder"}
+model ReminderUser {
+    reminderUserId String @id @db.Char(40)
+
+    user   User   @relation(fields: [userId], references: [userId])
+    userId String @db.Char(40)
+
+    reminder   Reminder @relation(fields: [reminderId], references: [reminderId])
+    reminderId String   @db.Char(40)
+
+    @@unique([userId, reminderId])
+}
+
+///{"modulePath": "src/modules/reminder"}
+model ReminderInstance {
+    reminderInstanceId String @id @db.Char(40)
+
+    reminderId String   @db.Char(40)
+    reminder   Reminder @relation(fields: [reminderId], references: [reminderId])
+
+    status ReminderInstanceStatus? // make sure length
+
+    dueTime     Int     @db.UnsignedInt
+    processed   Boolean @default(false)
+    isConducted Boolean @default(false) //meeting/reminder/todo successful
+    notes       String? @db.Text
+
+    callDuration  Int?      @db.UnsignedInt
+    callStartTime BigInt?
+    callEndTime   BigInt?
+    calledBy      Employee? @relation(fields: [calledByEmployeeId], references: [employeeId])
+
+    pdfFileUrl                   String?                       @db.VarChar(1024)
+    answerSheets                 QUAnswerSheet[]
+    Document                     Document[]
+    reminderInstanceToICD10Codes ReminderInstanceToICD10Code[]
+    calledByEmployeeId           String?                       @db.Char(40)
+}
+
+enum DurationType {
+    HANDOVER
+    PREP_TIME
+    COMMENT
+}
+
+model EmployeeActivityTime {
+    employeeServiceTimeId String @id @db.Char(40)
+
+    patient   Patient? @relation(fields: [patientId], references: [patientId])
+    patientId String?  @db.Char(40)
+
+    employee   Employee? @relation(fields: [employeeId], references: [employeeId])
+    employeeId String?   @db.Char(40)
+
+    startTime BigInt?
+    duration  Int     @default(0)
+
+    durationType      DurationType
+    timeAddedStatus   Boolean             @default(false)
+    timeDiscarded     Boolean             @default(false)
+    dateCreated       BigInt
+    dateUpdated       BigInt
+    CommentToPatients CommentToPatients[]
+}
+
+model Call {
+    callId String @id @db.Char(40)
+
+    startTime BigInt
+    endTime   BigInt
+
+    prepTime Int @default(0)
+
+    type   CallType
+    status CallStatus
+    reason CallReason @default(UNKNOWN)
+
+    comment String? @db.Text
+
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+    patientId String  @db.Char(40)
+
+    caller           Employee? @relation(fields: [callerEmployeeId], references: [employeeId])
+    callerEmployeeId String?   @db.Char(40)
+
+    healtcareFacility    HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+    healthcareFacilityId String             @db.Char(40)
+}
+
+enum CallStatus {
+    PICKED
+    DID_NOT_ANSWER
+}
+
+enum CallType {
+    NETWORK
+    CHARMS
+}
+
+enum CallReason {
+    TRAINING
+    FOLLOW_UP
+    ADHOC_FOLLOWUP
+    ADHOC_CALL
+    HANDOVER // To be removed
+    ESCALATION // To be removed
+    UNKNOWN
+}
+
+model ReminderType {
+    reminderTypeId String     @id @db.Char(40)
+    type           String     @db.Char(40)
+    color          String     @db.Char(40)
+    Reminders      Reminder[]
+}
+
+enum ReminderInstanceStatus {
+    BOOKED
+    CANCELLED
+    COMPLETED
+    DID_NOT_ANSWER
+    RESHEDULED
+    MISSED
+}
+
+enum AnswerType {
+    SINGLE_LINE
+    MULTI_LINE
+    BOOLEAN
+    SINGLE_CHOICE
+    MULTI_CHOICE
+    SPECIAL_BOOLEAN
+    FOLLOW_UP_TIME
+}
+
+enum QUQuestionnaireType {
+    FIRST_CHECKLIST
+    FOLLOW_UP
+    ESCALATION
+    MISCELLANEOUS
+    LEVEL1_QUESTIONNAIRE
+    LEVEL2_QUESTIONNAIRE
+}
+
+///{"modulePath": "src/modules/questionnaire"}
+model QUQuestionnaire {
+    questionnaireId String @id @db.Char(40)
+
+    name String @db.Char(255)
+
+    questionnaireType QUQuestionnaireType? @default(MISCELLANEOUS)
+
+    answerSheets QUAnswerSheet[]
+
+    orderable   Orderable? @relation(fields: [orderableId], references: [orderableId])
+    orderableId String?    @db.Char(40)
+
+    preNote        String? @db.Text
+    postNote       String? @db.Text
+    greetingScript String? @db.Text
+    endingScript   String? @db.Text
+
+    isDeleted                   Boolean                      @default(false)
+    dateCreated                 BigInt
+    dateUpdated                 BigInt
+    ///{"includeInCreate":true}
+    qUQuestionnaireToICD10Codes QUQuestionnaireToICD10Code[]
+
+    ///{"includeInCreate":true}
+    questions QUQuestion[]
+}
+
+///{"modulePath": "src/modules/questionnaire"}
+model QUQuestion {
+    questionId String     @id @db.Char(40)
+    question   String     @db.Text
+    answerType AnswerType
+    option     String?    @db.Text
+    refAnswer  String?
+    order      Int?
+
+    questionnaire     QUQuestionnaire @relation(fields: [qUQuestionnaireId], references: [questionnaireId])
+    answers           QUAnswer[]
+    qUQuestionnaireId String          @db.Char(40)
+}
+
+///{"modulePath": "src/modules/questionnaire"}
+model QUQuestionnaireToICD10Code {
+    QUQuestionnaireToICD10CodeId String @id @db.Char(40)
+
+    questionnaireId String          @db.Char(40)
+    questionnaire   QUQuestionnaire @relation(fields: [questionnaireId], references: [questionnaireId])
+
+    icd10CodeId String    @db.Char(40)
+    iCD10Code   ICD10Code @relation(fields: [icd10CodeId], references: [icd10CodeId])
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+///{"modulePath": "src/modules/questionnaire"}
+model QUAnswerSheet {
+    answerSheetId String @id @db.Char(40)
+
+    answerMarks     Float?
+    questionnaireId String          @db.Char(40)
+    questionnaire   QUQuestionnaire @relation(fields: [questionnaireId], references: [questionnaireId])
+
+    patientId String  @db.Char(40)
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    conductedById String? @db.Char(40)
+    conductedBy   User?   @relation(fields: [conductedById], references: [userId])
+
+    pdfFileUrl String? @db.VarChar(1024)
+
+    reminderInstanceId String?           @db.Char(40)
+    reminderInstance   ReminderInstance? @relation(fields: [reminderInstanceId], references: [reminderInstanceId])
+
+    icd10CodeId String?    @db.Char(40)
+    iCD10Code   ICD10Code? @relation(fields: [icd10CodeId], references: [icd10CodeId])
+
+    documentId String?   @db.Char(40)
+    document   Document? @relation(fields: [documentId], references: [documentId])
+
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    postNote      String?       @db.Text
+    answers       QUAnswer[]
+    USEscalation1 USEscalation? @relation("level1")
+    USEscalation2 USEscalation? @relation("level2")
+}
+
+///{"modulePath": "src/modules/questionnaire"}
+model QUAnswer {
+    answerId String @id @db.Char(40)
+
+    answerSheetId String        @db.Char(40)
+    answerSheet   QUAnswerSheet @relation(fields: [answerSheetId], references: [answerSheetId])
+
+    questionId String     @db.Char(40)
+    question   QUQuestion @relation(fields: [questionId], references: [questionId])
+
+    answer String? @db.Text
+}
+
+///{"modulePath": "src/modules/us-escalations"}
+model USEscalation {
+    usEscalationId String @id @db.Char(40)
+
+    openedBy   Employee @relation("openedBy", fields: [openedById], references: [employeeId])
+    openedById String   @db.Char(40)
+
+    handledBy   Employee? @relation("handledBy", fields: [handledById], references: [employeeId])
+    handledById String?   @db.Char(40)
+
+    orderableValue   OrderableValue @relation(fields: [orderableValueId], references: [orderableValueId])
+    orderableValueId String         @db.Char(40)
+
+    level1answerSheet   QUAnswerSheet  @relation("level1", fields: [level1answerSheetId], references: [answerSheetId])
+    level1answerSheetId String         @unique @db.Char(40)
+    level2answerSheet   QUAnswerSheet? @relation("level2", fields: [level2answerSheetId], references: [answerSheetId])
+    level2answerSheetId String?        @unique @db.Char(40)
+
+    readingsStartTime        BigInt?
+    readingsEndTime          BigInt?
+    EscalationGraphOrderable EscalationGraphOrderable[]
+
+    pdfUrl         String? @db.VarChar(1024)
+    makeCloseNotes String? @db.Text
+
+    escalationDuration Int @default(0)
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+///{"modulePath": "src/modules/us-escalations"}
+model EscalationGraphOrderable {
+    escalationGraphOrderableId String @id @db.Char(40)
+
+    orderable   Orderable @relation(fields: [orderableId], references: [orderableId])
+    orderableId String    @db.Char(40)
+
+    usEscalation   USEscalation @relation(fields: [usEscalationId], references: [usEscalationId])
+    usEscalationId String       @db.Char(40)
+}
+
+///{"modulePath": "src/modules/users"}
+model PatientRecruitment {
+    recruitmentId String @id @db.Char(40)
+
+    recruitmentDate BigInt
+
+    recruitedById String @db.Char(40)
+    recruitedBy   User   @relation(fields: [recruitedById], references: [userId])
+
+    healthcareFacilityId String             @db.Char(40)
+    healthcareFacility   HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+
+    excelFileUrl String @db.VarChar(1024)
+}
+
+enum NotificationType {
+    info
+    error
+    warning
+    success
+}
+
+enum NotificationCategory {
+    APPOINTMENT
+    VITAL
+    ESCALATION
+    ANNOUCEMENTS
+}
+
+model Notification {
+    notificationId String @id @db.Char(40)
+    userId         String @db.Char(40)
+
+    event String
+
+    title         String
+    body          String?               @db.Text
+    timeList      String?
+    message       String                @db.Text
+    category      NotificationCategory?
+    type          NotificationType
+    alarm         Boolean
+    isAutoRefresh Boolean
+    duration      Int                   @db.UnsignedInt
+
+    isRead    Boolean @default(false)
+    isDeleted Boolean @default(false)
+
+    dateCreated BigInt?
+    dateUpdated BigInt?
+}
+
+///{"modulePath": "src/modules"}
+model CPTCode {
+    cptCodeId String @id @db.Char(40)
+
+    cptCode String @unique @db.VarChar(64)
+    amount  Float
+
+    durationValue Int            @db.UnsignedInt
+    durationUnit  RepeatTimeUnit
+
+    dateCreated                  BigInt
+    dateUpdated                  BigInt
+    invoiceToCptCodes            InvoiceToCptCode[]
+    healthcareFacilityToCPTCodes healthcareFacilityToCPTCode[]
+}
+
+model healthcareFacilityToCPTCode {
+    healthcareFacilityToCPTCodeId String @id @db.Char(40)
+
+    cptCodeId String  @db.Char(40)
+    cptCode   CPTCode @relation(fields: [cptCodeId], references: [cptCodeId])
+
+    healthcareFacilityId String             @db.Char(40)
+    healthcareFacility   HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+
+    amount Float
+
+    dateCreated BigInt
+    dateUpdated BigInt
+}
+
+enum InvoiceStatus {
+    PROFORMA
+    OVERDUE
+    INVOICED
+    PAID_DISCOUNTED
+    PAID_FULL
+}
+
+enum healthcareFacilityInvoiceStatus {
+    DUE
+    OVERDUE
+    PAID
+}
+
+///{"modulePath": "src/modules"}
+model Invoice {
+    invoiceId String @id @db.Char(40)
+
+    invoiceCode Int    @unique @default(autoincrement())
+    invoiceNo   String @unique
+
+    billingRefNo String?
+
+    patientId String  @db.Char(40)
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+
+    healthcareFacilityId String             @db.Char(40)
+    healthcareFacility   HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+
+    healthcareFacilityInvoiceId String?                    @db.Char(40)
+    healthcareFacilityInvoice   HealthcareFacilityInvoice? @relation(fields: [healthcareFacilityInvoiceId], references: [healthcareFacilityInvoiceId], onDelete: Cascade, onUpdate: Cascade)
+
+    invoicedAmount       Float @default(0)
+    totalDiscount        Float @default(0)
+    totalPaymentReceived Float @default(0)
+
+    dueDate BigInt
+
+    invoiceFileUrl String? @db.VarChar(1024) // pdf that is created first time
+
+    dateCreated BigInt
+    dateUpdated BigInt
+
+    invoiceToCptCodes InvoiceToCptCode[]
+    document          Document[]
+}
+
+enum CommunicationMethod {
+    EMAIL
+    FAX
+    SMS
+}
+
+model CommunicationLog {
+    communicationLogId String @id @db.Char(40)
+
+    communicationMessage String? @db.Text
+
+    patient   Patient? @relation(fields: [patientId], references: [patientId])
+    patientId String?  @unique @db.Char(40)
+
+    communicationMethod CommunicationMethod
+
+    communicationDate     BigInt
+    faxInvoiceToCptCode   InvoiceToCptCode[] @relation("faxCommunicationLog")
+    emailInvoiceToCptCode InvoiceToCptCode[] @relation("emailCommunicationLog")
+}
+
+enum InvoiceToCptCodeStatus {
+    PROFORMA
+    PARTIAL
+    OVERDUE
+    INVOICED
+    PAID_DISCOUNTED
+    PAID_FULL
+    REJECTED_OR_DECLINED
+}
+
+model InvoiceToCptCode {
+    invoiceToCPTCodeId String @id @db.Char(40)
+
+    // invoiceToCptCodeNo Int? @unique @default(autoincrement())
+    invoiceToCptCodeNo String?
+
+    cptCode   CPTCode @relation(fields: [cPTCodeId], references: [cptCodeId])
+    cPTCodeId String  @db.Char(40)
+
+    invoice   Invoice @relation(fields: [invoiceId], references: [invoiceId], onDelete: Cascade, onUpdate: Cascade)
+    invoiceId String  @db.Char(40)
+
+    paymentToReceive Float @default(0)
+    discount         Float @default(0)
+
+    paymentReceived Float @default(0)
+    balanceDue      Float @default(0) // THIS IS AMOUNT LEFT TO PAY
+
+    invoiceToCptCodeUrl    String?                @db.VarChar(1024)
+    invoiceToCptCodeStatus InvoiceToCptCodeStatus @default(PROFORMA)
+
+    dateCreated BigInt
+    dateUpdated BigInt
+    dateApplied BigInt @default(0)
+
+    faxCommunicationLog   CommunicationLog? @relation("faxCommunicationLog", fields: [faxCommunicationLogId], references: [communicationLogId], onUpdate: Cascade, onDelete: Cascade)
+    faxCommunicationLogId String?           @db.Char(40)
+
+    emailCommunicationLog   CommunicationLog? @relation("emailCommunicationLog", fields: [emailCommunicationLogId], references: [communicationLogId], onUpdate: Cascade, onDelete: Cascade)
+    emailCommunicationLogId String?           @db.Char(40)
+
+    @@unique([cPTCodeId, invoiceId])
+}
+
+model HealthcareFacilityInvoice {
+    healthcareFacilityInvoiceId String @id @db.Char(40)
+
+    invoiceCode Int    @unique @default(autoincrement())
+    invoiceNo   String @unique
+
+    noOfPatients Int
+
+    healthcareFacilityId String             @db.Char(40)
+    healthcareFacility   HealthcareFacility @relation(fields: [healthcareFacilityId], references: [healthcareFacilityId])
+
+    dueDate BigInt
+
+    totalAmount Float
+
+    healthcareFacilityInvoiceStatus healthcareFacilityInvoiceStatus @default(DUE)
+
+    emailStatus String?
+    faxStatus   String?
+
+    pdfFileUrl String?
+
+    dateCreated BigInt
+    dateUpdated BigInt
+    invoice     Invoice[]
+}
+
+model TrainingMaterial {
+    trainingMaterialId   String  @id @db.Char(40)
+    trainingMaterialName String
+    brochurelUrl         String? @db.VarChar(1024)
+    videoUrl             String? @db.VarChar(1024)
+
+    orderable   Orderable? @relation(fields: [orderableId], references: [orderableId])
+    orderableId String?    @db.Char(40)
+}
+
+model ReminderInstanceToICD10Code {
+    reminderInstanceToICD10CodeId String @id @db.Char(40)
+
+    icd10Code   ICD10Code @relation(fields: [iCD10CodeId], references: [icd10CodeId])
+    iCD10CodeId String    @db.Char(40)
+
+    reminderInstance   ReminderInstance @relation(fields: [reminderInstanceId], references: [reminderInstanceId])
+    reminderInstanceId String           @db.Char(40)
+}
+
+model PatientProgressReport {
+    patientProgressReportId String @id @db.Char(40)
+
+    patient   Patient @relation(fields: [patientId], references: [patientId])
+    patientId String  @db.Char(40)
+
+    reportingMonth Int
+    reportingYear  Int
+    // reportingDate  Int? //the date of updating this row.
+
+    startDate       Int     @default(1) // value [1, activationDay]
+    endDate         Int     @default(31) //value []`end of month` or deActivationDay]
+    //Number of Readings
+    totalReadings   Int     @default(0)
+    lastReadingDate BigInt?
+
+    pAlert           Int @default(0)
+    readingPlusAlert Int @default(0)
+
+    //Call duration
+    totalCallDurationSec Int @default(0) //numberOfCallSec
+
+    auxiliaryDurationSec Int @default(0)
+
+    totalPrepTime     Int     @default(0)
+    lastEncounterDate BigInt? //Morst recent chronogically.
+
+    sortCriteriaReading  Float? @default(0)
+    sortCriteriaCalls    Float? @default(0)
+    sortCriteriaCombined Float? @default(0)
+
+    listOfReadingDates String //date of readings only
+    expectedBill       Int     @default(0)
+    appliedCPTCodes    String?
+
+    trainingCpt453  Int? //training
+    reading16Cpt454 Int? //16 days readings
+    call20Cpt457    Int? //first 20 minutes
+    call40Cpt458    Int? //additional 20 minutes
+    call60Cpt458b   Int? // Another additional 20 minutes
+    dayStatus       String?
+
+    callTimeRepord CallTimeRecord[]
+
+    @@unique([patientId, reportingMonth, reportingYear])
+}
+
+model CallTimeRecord {
+    callTimeRecordId String @id @db.Char(40)
+
+    // The time below do not include 1-1 communication with patient
+    prepTime       Int @default(0)
+    handoverTime   Int @default(0)
+    escalationTime Int @default(0)
+    commentTime    Int @default(0)
+
+    networkMissedCall  Int @default(0)
+    adhocMissedCall    Int @default(0)
+    followUpMissedCall Int @default(0)
+
+    // The time below include 1-1 communication with patient
+    adhocPopupCall Int @default(0)
+
+    regularFollowupCall Int @default(0)
+    manualFollowUpCall  Int @default(0)
+    adhocReportNetwork  Int @default(0)
+
+    patientProgressReportId String                @unique() @db.Char(40)
+    patientProgressReport   PatientProgressReport @relation(fields: [patientProgressReportId], references: [patientProgressReportId])
+}
+
+enum AutoCompleteType {
+    ADHOC_CALL
+    NURSE_NOTES
+    DOCTOR_NOTES
+}
+
+model AutoComplete {
+    autoCompleteId   String           @id @default(uuid())
+    autoCompleteType AutoCompleteType
+    key              String           @unique
+    value            String           @db.Text
+}
+
+model TableColumnConfig {
+    tableColConfigId String @id @db.Char(40)
+
+    user   User   @relation(fields: [userId], references: [userId])
+    userId String @db.Char(40)
+
+    viewName String
+
+    colConfig String @db.Text
+
+    @@unique([userId, viewName])
+}

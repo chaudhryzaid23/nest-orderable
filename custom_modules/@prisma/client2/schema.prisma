@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+    provider = "prisma-client-js"
+    output   = "../custom_modules/@prisma/client2"
+}
+
+datasource db {
+    provider = "mysql"
+    url      = env("LOGGING_DATABASE_URL")
+}
+
+model ApiCallLog {
+    apiCallLogId String  @id @db.Char(40)
+    endpoint     String  @db.Text
+    timeTaken    Float?
+    username     String?
+    agent        String?
+    appVersion   String?
+
+    request  String  @db.Text
+    response String? @db.Text
+
+    method String
+    mobile String?
+    device String?
+
+    createdById String? @db.Char(40)
+
+    dateCreated BigInt?
+    dateUpdated BigInt?
+}
