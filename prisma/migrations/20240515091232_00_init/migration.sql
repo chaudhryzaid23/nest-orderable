@@ -2004,4 +2004,3 @@ ALTER TABLE `CallTimeRecord` ADD CONSTRAINT `CallTimeRecord_patientProgressRepor
 
 -- AddForeignKey
 ALTER TABLE `TableColumnConfig` ADD CONSTRAINT `TableColumnConfig_userId_fkey` FOREIGN KEY (`userId`) REFERENCES `User`(`userId`) ON DELETE RESTRICT ON UPDATE CASCADE;
-

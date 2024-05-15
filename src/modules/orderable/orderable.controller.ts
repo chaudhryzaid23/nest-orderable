@@ -23,10 +23,10 @@ export class OrderableController {
 
   @Get()
   findAll() {
-    return this.orderableService.findAll();
+    return this.orderableService.PPRQueryRaw();
   }
 
-  @Get('knex')
+  @Get('patient-progress-report')
   findAllKnex() {
     return this.orderableService.findKnex();
   }

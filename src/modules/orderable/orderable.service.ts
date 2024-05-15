@@ -43,34 +43,76 @@ export class OrderableService {
     return `This action removes a #${id} orderable`;
   }
 
-  async prismaPatientProgressReportQuery() {
+  async PPRQueryRaw() {
     const patientId = 'AHSAN-PATIENT-ID';
-    const startTime = 0;
-    const endTime = 999999999999;
-    const recs = await this.prisma.uSEscalation.findMany({
-      select: { orderableValue: { select: { orderableId: true } } },
+    const startDate = 0;
+    const endDate = 999999999999;
+
+    const results: any[] = await this.prisma.$queryRaw`
+        SELECT
+            ov.orderableId AS orderableId,
+            DATE(FROM_UNIXTIME(ov.acquisitionTime)) AS date,
+            MAX(rv.numericValue) AS lastNumericValue,
+            COUNT(rv.status) AS statusCount,
+            o.* -- Include all columns from Orderable table
+        FROM
+            ResultableValue AS rv
+        JOIN OrderableValue AS ov ON rv.orderableValueId = ov.orderableValueId
+        JOIN 
+        (
+          SELECT 
+            ov2.orderableValueId, 
+            MAX(ov2.acquisitionTime) AS maxAcquisitionTime
+          FROM OrderableValue ov2
+          WHERE ov2.acquisitionTime >= ${startDate} 
+                AND ov2.acquisitionTime <= ${endDate}
+                AND ov2.patientId = ${patientId}   -- Filter by patientId in subquery
+          GROUP BY ov2.orderableValueId, DATE(FROM_UNIXTIME(ov2.acquisitionTime))
+        ) AS ovMax ON rv.orderableValueId = ovMax.orderableValueId AND ov.acquisitionTime = ovMax.maxAcquisitionTime
+        JOIN Orderable AS o ON ov.orderableId = o.orderableId
+        WHERE ov.acquisitionTime >= ${startDate} AND ov.acquisitionTime <= ${endDate} AND ov.patientId = ${patientId} -- Filter by patientId in main query
+        GROUP BY ov.orderableId, DATE(FROM_UNIXTIME(ov.acquisitionTime))
+        ORDER BY MAX(ov.acquisitionTime) ASC;`; // Order by the max reading time within each group
+
+    console.log('results: ', results);
+
+    return `Total Records are: ${results.length}`;
+  }
+
+  async prismaPatientProgressReportQueryPrisma() {
+    const patientId = 'AHSAN-PATIENT-ID';
+    const startDate = 0;
+    const endDate = 999999999999;
+
+    const orderables = await this.prisma.orderable.findMany({
+      distinct: ['orderableId'],
       where: {
-        orderableValue: {
-          patientId,
-          acquisitionTime: { gte: startTime, lte: endTime },
+        orderableValues: {
+          some: {
+            acquisitionTime: { gte: startDate, lt: endDate },
+            patientId: patientId,
+          },
         },
       },
     });
 
-    let orderableIds: Set<string> = new Set();
+    let orderableIds: string[] = [];
 
-    recs.map((rec) => {
-      orderableIds.add(rec.orderableValue.orderableId);
-    });
-    const result = await this.prisma.orderableValue.findMany({
-      where: {
-        patientId,
-        acquisitionTime: { gte: startTime, lte: endTime },
-        orderableId: { in: Array.from(orderableIds) },
-      },
+    orderables.map((rec) => {
+      orderableIds.push(rec.orderableId);
     });
 
-    return `Total Records are: ${result.length}`;
+    // last resultableValues for for each orderable
+
+    const results = await this.prisma.orderableValue.groupBy({
+      by: ['acquisitionTime'],
+      having: { acquisitionTime: { not: null } },
+      where: { orderableId: { in: orderableIds }, patientId: patientId },
+      orderBy: { acquisitionTime: Prisma.SortOrder.desc },
+      take: 1,
+    });
+
+    return `Total Records are: ${results.length}`;
   }
 
   async prismaQuery() {
