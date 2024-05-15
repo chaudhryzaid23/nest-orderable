@@ -45,34 +45,40 @@ export class OrderableService {
 
   async PPRQueryRaw() {
     const patientId = 'AHSAN-PATIENT-ID';
-    const startDate = 0;
-    const endDate = 999999999999;
+    const startDate = 1713052800;
+    const endDate = 1715767365;
 
     const results: any[] = await this.prisma.$queryRaw`
         SELECT
             ov.orderableId AS orderableId,
             DATE(FROM_UNIXTIME(ov.acquisitionTime)) AS date,
-            MAX(rv.numericValue) AS lastNumericValue,
-            COUNT(rv.status) AS statusCount,
+            ov.acquisitionTime,
+            rv.numericValue AS lastNumericValue,
+            ovMax.orderableValueId,
+            rv.resultableValueId,
+            rv.status, -- Include ResultableValue status
             o.* -- Include all columns from Orderable table
         FROM
             ResultableValue AS rv
         JOIN OrderableValue AS ov ON rv.orderableValueId = ov.orderableValueId
         JOIN 
         (
-          SELECT 
-            ov2.orderableValueId, 
-            MAX(ov2.acquisitionTime) AS maxAcquisitionTime
-          FROM OrderableValue ov2
-          WHERE ov2.acquisitionTime >= ${startDate} 
+            SELECT 
+                ov2.orderableValueId, 
+                MAX(ov2.acquisitionTime) AS maxAcquisitionTime
+            FROM 
+                OrderableValue ov2
+            WHERE 
+                ov2.acquisitionTime >= ${startDate} 
                 AND ov2.acquisitionTime <= ${endDate}
-                AND ov2.patientId = ${patientId}   -- Filter by patientId in subquery
-          GROUP BY ov2.orderableValueId, DATE(FROM_UNIXTIME(ov2.acquisitionTime))
+                AND ov2.patientId = ${patientId}
+            GROUP BY 
+                ov2.orderableValueId, 
+                DATE(FROM_UNIXTIME(ov2.acquisitionTime))
         ) AS ovMax ON rv.orderableValueId = ovMax.orderableValueId AND ov.acquisitionTime = ovMax.maxAcquisitionTime
         JOIN Orderable AS o ON ov.orderableId = o.orderableId
-        WHERE ov.acquisitionTime >= ${startDate} AND ov.acquisitionTime <= ${endDate} AND ov.patientId = ${patientId} -- Filter by patientId in main query
-        GROUP BY ov.orderableId, DATE(FROM_UNIXTIME(ov.acquisitionTime))
-        ORDER BY MAX(ov.acquisitionTime) ASC;`; // Order by the max reading time within each group
+        WHERE ov.acquisitionTime >= ${startDate} AND ov.acquisitionTime <= ${endDate} AND ov.patientId = ${patientId}
+        ORDER BY ov.acquisitionTime ASC;`; // Order by the max reading time within each group
 
     console.log('results: ', results);
 
