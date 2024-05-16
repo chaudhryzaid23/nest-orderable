@@ -9,6 +9,11 @@ import { PRISMA_SERVICE } from 'src/multi-tenant/multi-tenant.module';
 import { Knex } from 'knex';
 import { InjectKnex } from 'nestjs-knex';
 
+interface DailyTime {
+  maxAcquisitionDate: number;
+  maxAcquisitionTime: number;
+}
+
 @Injectable()
 export class OrderableService {
   constructor(
@@ -85,10 +90,10 @@ export class OrderableService {
     return `Total Records are: ${results.length}`;
   }
 
-  async prismaPatientProgressReportQueryPrisma() {
-    const patientId = 'AHSAN-PATIENT-ID';
-    const startDate = 0;
-    const endDate = 999999999999;
+  async PPRQueryPrismaMixed() {
+    const patientId = 'a3c33f6a-6f56-410d-a3c3-2861211911d1';
+    const startDate = 1713052800;
+    const endDate = 1715767365;
 
     const orderables = await this.prisma.orderable.findMany({
       distinct: ['orderableId'],
@@ -103,22 +108,50 @@ export class OrderableService {
     });
 
     let orderableIds: string[] = [];
-
+    let acquisitionTimes: number[] = [];
     orderables.map((rec) => {
       orderableIds.push(rec.orderableId);
     });
 
-    // last resultableValues for for each orderable
+    for (let currOrderableId of orderableIds) {
+      const relevantTimes = await this.prisma.$queryRaw<DailyTime[]>`
+      SELECT 
+          DATE(FROM_UNIXTIME(ov2.acquisitionTime)) AS maxAcquisitionDate,
+          MAX(ov2.acquisitionTime) AS maxAcquisitionTime
+      FROM OrderableValue ov2 
+      JOIN
+          Orderable AS o ON o.orderableId=ov2.orderableId
+      WHERE
+          o.orderableId = ${currOrderableId}
+          AND ov2.acquisitionTime >= ${startDate} 
+          AND ov2.acquisitionTime <= ${endDate}
+          AND ov2.patientId = ${patientId} 
+      GROUP BY DATE(FROM_UNIXTIME(ov2.acquisitionTime))`;
 
-    const results = await this.prisma.orderableValue.groupBy({
-      by: ['acquisitionTime'],
-      having: { acquisitionTime: { not: null } },
-      where: { orderableId: { in: orderableIds }, patientId: patientId },
-      orderBy: { acquisitionTime: Prisma.SortOrder.desc },
-      take: 1,
+      relevantTimes.forEach((relevantTime, i) => {
+        acquisitionTimes.push(relevantTime.maxAcquisitionTime);
+      });
+    }
+
+    const recs = await this.prisma.orderableValue.findMany({
+      select: {
+        acquisitionTime: true,
+        orderable: { select: { name: true } },
+        resultableValues: {
+          select: {
+            numericValue: true,
+            resultable: { select: { name: true } },
+          },
+        },
+      },
+      where: {
+        acquisitionTime: { in: acquisitionTimes },
+      },
     });
 
-    return `Total Records are: ${results.length}`;
+    console.log('recs', recs);
+
+    // return `Total Records are: ${results.length}`;
   }
 
   async prismaQuery() {

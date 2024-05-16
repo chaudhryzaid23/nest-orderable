@@ -23,7 +23,8 @@ export class OrderableController {
 
   @Get()
   findAll() {
-    return this.orderableService.PPRQueryRaw();
+    // return this.orderableService.PPRQueryRaw();
+    return this.orderableService.PPRQueryPrismaMixed();
   }
 
   @Get('patient-progress-report')
