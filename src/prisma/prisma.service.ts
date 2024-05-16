@@ -14,8 +14,8 @@ export type PrismaTransaction = Omit<
 
 export class PrismaService extends PrismaClient {
   constructor(private options: PrismaServiceOptions) {
-    console.log('here', options.url);
-    console.trace();
+    // console.log('here', options.url);
+    // console.trace();
     super({
       log: [
         {

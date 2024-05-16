@@ -116,7 +116,7 @@ export class OrderableService {
     for (let currOrderableId of orderableIds) {
       const relevantTimes = await this.prisma.$queryRaw<DailyTime[]>`
       SELECT 
-          DATE(FROM_UNIXTIME(ov2.acquisitionTime)) AS maxAcquisitionDate,
+          DATE(CONVERT_TZ(FROM_UNIXTIME(ov2.acquisitionTime), 'UTC','America/Dallas')) AS maxAcquisitionDate,
           MAX(ov2.acquisitionTime) AS maxAcquisitionTime
       FROM OrderableValue ov2 
       JOIN
@@ -126,7 +126,7 @@ export class OrderableService {
           AND ov2.acquisitionTime >= ${startDate} 
           AND ov2.acquisitionTime <= ${endDate}
           AND ov2.patientId = ${patientId} 
-      GROUP BY DATE(FROM_UNIXTIME(ov2.acquisitionTime))`;
+      GROUP BY DATE(CONVERT_TZ(FROM_UNIXTIME(ov2.acquisitionTime), 'UTC','America/Dallas'))`;
 
       relevantTimes.forEach((relevantTime, i) => {
         acquisitionTimes.push(relevantTime.maxAcquisitionTime);
