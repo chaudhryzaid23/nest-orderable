@@ -9,9 +9,40 @@ import { PRISMA_SERVICE } from 'src/multi-tenant/multi-tenant.module';
 import { Knex } from 'knex';
 import { InjectKnex } from 'nestjs-knex';
 
-interface DailyTime {
+export interface DailyTime {
   maxAcquisitionDate: number;
   maxAcquisitionTime: number;
+}
+
+export interface PatientStatus {
+  orderableId: string;
+  orderableValueStatus: string;
+  statusCount: number;
+}
+
+export interface ResultableRanges {
+  warnLow: number;
+  normalLow: number;
+  normalHigh: number;
+  warnHigh: number;
+  minErrorValue: number;
+  maxErrorValue: number;
+  abnormalLow?: number;
+  abnormalHigh?: number;
+}
+
+export function getStartAndEndOfMonthUnixTimestamps(unixTimestamp: number) {
+  const date = new Date(unixTimestamp * 1000);
+  const year = date.getFullYear();
+  const month = date.getMonth();
+
+  const startOfMonth = new Date(year, month, 1);
+  const startUnixTimestamp = Math.floor(startOfMonth.getTime() / 1000);
+
+  const endOfMonth = new Date(year, month + 1, 0);
+  const endUnixTimestamp = Math.floor(endOfMonth.getTime() / 1000) + 86400;
+
+  return { start: startUnixTimestamp, end: endUnixTimestamp };
 }
 
 @Injectable()
@@ -92,8 +123,11 @@ export class OrderableService {
 
   async PPRQueryPrismaMixed() {
     const patientId = 'a3c33f6a-6f56-410d-a3c3-2861211911d1';
-    const startDate = 1713052800;
-    const endDate = 1715767365;
+    const dates = getStartAndEndOfMonthUnixTimestamps(Date.now() / 1000);
+    const startDate = dates.start;
+    const endDate = dates.end;
+
+    console.log('times', startDate, endDate);
 
     const orderables = await this.prisma.orderable.findMany({
       distinct: ['orderableId'],
@@ -116,7 +150,7 @@ export class OrderableService {
     for (let currOrderableId of orderableIds) {
       const relevantTimes = await this.prisma.$queryRaw<DailyTime[]>`
       SELECT 
-          DATE(CONVERT_TZ(FROM_UNIXTIME(ov2.acquisitionTime), 'UTC','America/Dallas')) AS maxAcquisitionDate,
+          DATE(CONVERT_TZ(FROM_UNIXTIME(ov2.acquisitionTime), 'UTC','America/Chicago')) AS maxAcquisitionDate,
           MAX(ov2.acquisitionTime) AS maxAcquisitionTime
       FROM OrderableValue ov2 
       JOIN
@@ -126,32 +160,132 @@ export class OrderableService {
           AND ov2.acquisitionTime >= ${startDate} 
           AND ov2.acquisitionTime <= ${endDate}
           AND ov2.patientId = ${patientId} 
-      GROUP BY DATE(CONVERT_TZ(FROM_UNIXTIME(ov2.acquisitionTime), 'UTC','America/Dallas'))`;
+      GROUP BY DATE(CONVERT_TZ(FROM_UNIXTIME(ov2.acquisitionTime), 'UTC','America/Chicago'))`;
 
       relevantTimes.forEach((relevantTime, i) => {
         acquisitionTimes.push(relevantTime.maxAcquisitionTime);
       });
     }
 
-    const recs = await this.prisma.orderableValue.findMany({
-      select: {
-        acquisitionTime: true,
-        orderable: { select: { name: true } },
-        resultableValues: {
-          select: {
-            numericValue: true,
-            resultable: { select: { name: true } },
+    // const recsGroupBy = await this.prisma.$queryRaw<DailyTime[]>`
+    // SELECT
+    //     o.orderableId,
+    //     ov2.orderableValueId,
+    //     DATE(CONVERT_TZ(FROM_UNIXTIME(ov2.acquisitionTime), 'UTC','America/Chicago')),
+    //     ov2.status,
+    //     o.name
+    // FROM OrderableValue ov2
+    // JOIN
+    //     Orderable AS o ON o.orderableId=ov2.orderableId
+    // WHERE
+    //     o.orderableId = ${'5'}
+    //     AND ov2.acquisitionTime >= ${startDate}
+    //     AND ov2.acquisitionTime <= ${endDate}
+    //     AND ov2.patientId = ${patientId}`;
+
+    console.log('ids: ', orderableIds);
+    const orderableIdsStr = "'" + orderableIds.join("', '") + "'";
+    console.log(orderableIdsStr); // Output: "1,2,3,4,5"
+    // orderableIdsStr = `${orderableIdsStr.substring(0, orderableIdsStr.length - 2)}`;
+
+    console.log(orderableIdsStr);
+
+    if (orderableIds.length > 0) {
+      console.log(orderableIdsStr, 's');
+
+      const recsGroupBy = await this.prisma.$queryRaw<PatientStatus[]>`
+        SELECT 
+            o.orderableId AS orderableId,
+            ov2.status AS orderableValueStatus,
+            COUNT(ov2.status) AS statusCount
+        FROM OrderableValue ov2 
+        JOIN
+            Orderable AS o ON o.orderableId=ov2.orderableId
+        WHERE
+            o.orderableId in (${orderableIdsStr})
+            AND ov2.acquisitionTime >= ${startDate} 
+            AND ov2.acquisitionTime <= ${endDate}
+            AND ov2.patientId = ${patientId}
+          GROUP BY o.orderableId, ov2.status`;
+
+      console.log('recsGroupBy: ', recsGroupBy);
+
+      const recs = await this.prisma.orderableValue.findMany({
+        select: {
+          acquisitionTime: true,
+          orderable: { select: { orderableId: true, name: true } },
+          resultableValues: {
+            select: {
+              numericValue: true,
+              resultable: {
+                include: {
+                  patientResultableRanges: { where: { patientId: patientId } },
+                },
+              },
+            },
           },
         },
-      },
-      where: {
-        acquisitionTime: { in: acquisitionTimes },
-      },
-    });
+        where: {
+          acquisitionTime: { in: acquisitionTimes },
+          patientId: patientId,
+        },
+      });
 
-    console.log('recs', recs);
+      const recsComp = recs.map((rec) => {
+        const acquisitionTime = rec.acquisitionTime;
 
-    // return `Total Records are: ${results.length}`;
+        let ranges: ResultableRanges;
+        const newResultableValue = rec.resultableValues.map((rv) => {
+          if (
+            'resultable' in rv &&
+            'patientResultableRanges' in rv.resultable &&
+            rv.resultable.patientResultableRanges.length > 0
+          ) {
+            console.log(
+              'resultable ranges',
+              rv.resultable.patientResultableRanges,
+            );
+            ranges = {
+              warnHigh: rv.resultable.patientResultableRanges[0].warnHigh,
+              warnLow: rv.resultable.patientResultableRanges[0].warnLow,
+              normalHigh: rv.resultable.patientResultableRanges[0].normalHigh,
+              normalLow: rv.resultable.patientResultableRanges[0].normalLow,
+              maxErrorValue: rv.resultable.patientResultableRanges[0].maxValue,
+              minErrorValue: rv.resultable.patientResultableRanges[0].minValue,
+              abnormalHigh:
+                rv.resultable.patientResultableRanges[0].abnormalHigh,
+              abnormalLow: rv.resultable.patientResultableRanges[0].abnormalLow,
+            };
+          } else {
+            ranges = {
+              warnHigh: rv.resultable.warnHigh,
+              warnLow: rv.resultable.warnLow,
+              normalHigh: rv.resultable.normalHigh,
+              normalLow: rv.resultable.normalLow,
+              maxErrorValue: rv.resultable.maxErrorValue,
+              minErrorValue: rv.resultable.minErrorValue,
+              abnormalHigh: rv.resultable.abnormalHigh,
+              abnormalLow: rv.resultable.abnormalLow,
+            };
+          }
+
+          return {
+            orderableId: rec.orderable.orderableId,
+            orderableName: rec.orderable.name,
+            resultableName: rv.resultable.name,
+            acquisitionTime: acquisitionTime,
+            numericValue: rv.numericValue,
+          };
+        });
+
+        return newResultableValue;
+      });
+
+      return {
+        resultableValues: recsComp,
+        recsGroupby: recsGroupBy,
+      };
+    }
   }
 
   async prismaQuery() {

@@ -6,6 +6,10 @@ import { PrismaService } from './prisma/prisma.service';
 import { EnvironmentVars } from './common/common.types';
 import { MultiTenantMiddleware } from './multi-tenant/multi-tenant.middleware';
 
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 function processSchedulesAndReminders(configService: ConfigService) {
   const tenantConfigs: { [host: string]: TenantConfig } =
     configService.get('multiTenant');
