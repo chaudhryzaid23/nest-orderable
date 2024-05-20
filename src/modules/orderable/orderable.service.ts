@@ -121,8 +121,7 @@ export class OrderableService {
     return `Total Records are: ${results.length}`;
   }
 
-  async PPRQueryPrismaMixed() {
-    const patientId = 'a3c33f6a-6f56-410d-a3c3-2861211911d1';
+  async PPRQueryPrismaMixed(patientId: string) {
     const dates = getStartAndEndOfMonthUnixTimestamps(Date.now() / 1000);
     const startDate = dates.start;
     const endDate = dates.end;
@@ -167,56 +166,38 @@ export class OrderableService {
       });
     }
 
-    // const recsGroupBy = await this.prisma.$queryRaw<DailyTime[]>`
-    // SELECT
-    //     o.orderableId,
-    //     ov2.orderableValueId,
-    //     DATE(CONVERT_TZ(FROM_UNIXTIME(ov2.acquisitionTime), 'UTC','America/Chicago')),
-    //     ov2.status,
-    //     o.name
-    // FROM OrderableValue ov2
-    // JOIN
-    //     Orderable AS o ON o.orderableId=ov2.orderableId
-    // WHERE
-    //     o.orderableId = ${'5'}
-    //     AND ov2.acquisitionTime >= ${startDate}
-    //     AND ov2.acquisitionTime <= ${endDate}
-    //     AND ov2.patientId = ${patientId}`;
-
-    console.log('ids: ', orderableIds);
-    const orderableIdsStr = "'" + orderableIds.join("', '") + "'";
-    console.log(orderableIdsStr); // Output: "1,2,3,4,5"
-    // orderableIdsStr = `${orderableIdsStr.substring(0, orderableIdsStr.length - 2)}`;
-
-    console.log(orderableIdsStr);
+    const orderableIdsStr = orderableIds
+      .map((value: string) => `'${value}'`)
+      .join(',');
 
     if (orderableIds.length > 0) {
-      console.log(orderableIdsStr, 's');
+      const rawQuery = `
+      SELECT 
+          o.orderableId AS orderableId,
+          ov2.status AS orderableValueStatus,
+          COUNT(ov2.status) AS statusCount
+      FROM OrderableValue ov2 
+      JOIN
+          Orderable AS o ON o.orderableId=ov2.orderableId
+      WHERE
+          o.orderableId IN (${orderableIdsStr})
+          AND ov2.acquisitionTime >= ${startDate} 
+          AND ov2.acquisitionTime <= ${endDate}
+          AND ov2.patientId = '${patientId}'
+        GROUP BY o.orderableId, ov2.status`;
 
-      const recsGroupBy = await this.prisma.$queryRaw<PatientStatus[]>`
-        SELECT 
-            o.orderableId AS orderableId,
-            ov2.status AS orderableValueStatus,
-            COUNT(ov2.status) AS statusCount
-        FROM OrderableValue ov2 
-        JOIN
-            Orderable AS o ON o.orderableId=ov2.orderableId
-        WHERE
-            o.orderableId in (${orderableIdsStr})
-            AND ov2.acquisitionTime >= ${startDate} 
-            AND ov2.acquisitionTime <= ${endDate}
-            AND ov2.patientId = ${patientId}
-          GROUP BY o.orderableId, ov2.status`;
-
-      console.log('recsGroupBy: ', recsGroupBy);
+      const recsGroupBy =
+        await this.prisma.$queryRawUnsafe<PatientStatus[]>(rawQuery);
 
       const recs = await this.prisma.orderableValue.findMany({
         select: {
+          orderableValueId: true,
           acquisitionTime: true,
           orderable: { select: { orderableId: true, name: true } },
           resultableValues: {
             select: {
               numericValue: true,
+              resultableValueId: true,
               resultable: {
                 include: {
                   patientResultableRanges: { where: { patientId: patientId } },
@@ -270,7 +251,10 @@ export class OrderableService {
           }
 
           return {
+            orderableValueId: rec.orderableValueId,
+            resultableValueId: rv.resultableValueId,
             orderableId: rec.orderable.orderableId,
+            resultableId: rv.resultable.resultableId,
             orderableName: rec.orderable.name,
             resultableName: rv.resultable.name,
             acquisitionTime: acquisitionTime,
@@ -282,8 +266,8 @@ export class OrderableService {
       });
 
       return {
-        resultableValues: recsComp,
-        recsGroupby: recsGroupBy,
+        readings: recsComp,
+        statusCounts: recsGroupBy,
       };
     }
   }

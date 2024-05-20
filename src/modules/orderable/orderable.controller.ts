@@ -24,7 +24,8 @@ export class OrderableController {
   @Get()
   findAll() {
     // return this.orderableService.PPRQueryRaw();
-    return this.orderableService.PPRQueryPrismaMixed();
+    const patientId = 'a3c33f6a-6f56-410d-a3c3-2861211911d1';
+    return this.orderableService.PPRQueryPrismaMixed(patientId);
   }
 
   @Get('patient-progress-report')
